@@ -6,17 +6,13 @@ from dataclasses import asdict
 import pytest
 import serial
 
-from minitela import __version__, cli, control, hyprland
+from minitela import __version__, cli, control, runner
 from minitela.device import Device
 from minitela.transport import connection
 from minitela.transport.discovery import SerialDevice
 from minitela.transport.fake import FakeTransport, SimulatedScreen
 
 MINITELA = SerialDevice("/dev/ttyACM0", "0324", "0324", "sxw-admin_CDC_DEMO")
-# Replaced in every test by the system_monitors fixture.
-REAL_SLEEP_MONITOR = cli._sleep_monitor
-REAL_LOCK_MONITOR = cli._lock_monitor
-REAL_HYPRLAND_MONITOR = cli._hyprland_lock_monitor
 
 
 @pytest.fixture(autouse=True)
@@ -425,7 +421,7 @@ def run_notifications(monkeypatch, argv, notifications, fail=False):
             raise KeyboardInterrupt
         monitors[0].callback(Notification(*pending.pop(0)))
 
-    monkeypatch.setattr(cli, "_notification_monitor", make_monitor)
+    monkeypatch.setattr(runner, "make_notification_monitor", make_monitor)
     monkeypatch.setattr(cli.time, "sleep", sleep)
     code = cli.main(argv)
     return code, monitors
@@ -462,7 +458,7 @@ def test_default_notification_monitor():
     pytest.importorskip("gi")
     from minitela.sources.notifications_gio import NotificationMonitor
 
-    assert isinstance(cli._notification_monitor(lambda n: None), NotificationMonitor)
+    assert isinstance(runner.make_notification_monitor(lambda n: None), NotificationMonitor)
 
 
 @pytest.fixture
@@ -521,170 +517,59 @@ def test_config_invalid(config_home, capsys, argv, message):
     assert message in capsys.readouterr().err
 
 
-class FakeService:
-    def __init__(self, open_transport, make_sources, settings_path):
-        self.open_transport, self.make_sources = open_transport, make_sources
-        self.settings_path = settings_path
-        self.stopped = False
-        self.blanked = []
+class FakeRunner:
+    """Stands for minitela.runner.Runner in the 'run' command."""
 
-    def set_blanked(self, reason, blanked):
-        self.blanked.append((reason, blanked))
+    def __init__(self, port=None, refuse=False):
+        self.port, self.refuse = port, refuse
+        self.events = []
 
-    def handle_command(self, command):
-        return "ok"
+    def start(self):
+        if self.refuse:
+            raise OSError("another minitela service is running (control.sock)")
+        self.events.append("start")
 
     def run(self):
+        self.events.append("run")
         raise KeyboardInterrupt
 
     def stop(self):
-        self.stopped = True
+        self.events.append("stop")
+
+    def close(self):
+        self.events.append("close")
 
 
 @pytest.fixture
-def services(monkeypatch, config_home):
-    """Replaces the service: returns the instances created, and the signal handlers."""
+def runners(monkeypatch):
     created = []
     handlers = {}
-    monkeypatch.setattr(
-        cli, "Service", lambda *args: created.append(FakeService(*args)) or created[-1]
-    )
+
+    def make(port=None):
+        created.append(FakeRunner(port))
+        return created[-1]
+
+    monkeypatch.setattr(cli, "Runner", make)
     monkeypatch.setattr(cli.signal, "signal", lambda sig, handler: handlers.update({sig: handler}))
     return created, handlers
 
 
-@pytest.fixture(autouse=True)
-def system_monitors(monkeypatch):
-    """Never touch the real logind or screen saver in tests: {"sleep": [...], "lock": [...]}."""
-    created = {"sleep": [], "lock": [], "hyprland": []}
-
-    def factory(kind):
-        def make(callback):
-            created[kind].append(FakeMonitor(callback))
-            return created[kind][-1]
-
-        return make
-
-    monkeypatch.setattr(cli, "_sleep_monitor", factory("sleep"))
-    monkeypatch.setattr(cli, "_lock_monitor", factory("lock"))
-    monkeypatch.setattr(cli, "_hyprland_lock_monitor", factory("hyprland"))
-    return created
-
-
-@pytest.fixture
-def monitors(monkeypatch):
-    created = []
-
-    def make(push):
-        created.append(FakeMonitor(push))
-        return created[-1]
-
-    monkeypatch.setattr(cli, "_notification_monitor", make)
-    return created
-
-
-def test_run(monkeypatch, services, monitors, caplog):
+def test_run(runners, caplog):
     caplog.set_level("INFO")
-    created, handlers = services
-    monkeypatch.setattr(cli, "_system_bus", lambda: "system bus")
-    assert cli.main(["run"]) == 0
-    (service,) = created
-    sources = [s.name for s in service.make_sources(cli.Settings())]
-    assert "battery" in sources and "notifications" in sources
-    assert service.settings_path.name == "settings.json"
-    assert not monitors[0].running  # stopped on exit
+    created, handlers = runners
+    assert cli.main(["--port", "/dev/ttyACM3", "run"]) == 0
+    (runner,) = created
+    assert runner.port == "/dev/ttyACM3"
+    assert runner.events == ["start", "run", "close"]
     handlers[cli.signal.SIGTERM](15, None)
-    assert service.stopped
+    assert runner.events[-1] == "stop"
     assert "running" in caplog.text
 
 
-def test_run_blanks_on_suspend_and_lock(monkeypatch, services, monitors, system_monitors):
-    created, _ = services
-    monkeypatch.setattr(cli, "_system_bus", lambda: None)
-    cli.main(["run"])
-    (sleep_monitor,), (lock_monitor,) = system_monitors["sleep"], system_monitors["lock"]
-    (hyprland_monitor,) = system_monitors["hyprland"]
-    sleep_monitor.callback(True)
-    lock_monitor.callback(True)
-    hyprland_monitor.callback(True)
-    assert created[0].blanked == [("sleep", True), ("lock", True), ("hyprland-lock", True)]
-    assert not any(m.running for m in (sleep_monitor, lock_monitor, hyprland_monitor))
-
-
-def test_run_outside_hyprland(monkeypatch, services, monitors, caplog):
-    monkeypatch.setattr(cli, "_system_bus", lambda: None)
-    monkeypatch.setattr(cli, "_hyprland_lock_monitor", lambda on_lock: None)
-    assert cli.main(["run"]) == 0
-    assert "Hyprland" not in caplog.text
-
-
-def test_default_hyprland_monitor(monkeypatch, tmp_path):
-    monkeypatch.setenv("HYPRLAND_INSTANCE_SIGNATURE", "abc")
-    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path))
-    monitor = REAL_HYPRLAND_MONITOR(lambda locked: None)
-    assert isinstance(monitor, hyprland.HyprlandLockMonitor)
-    monkeypatch.delenv("HYPRLAND_INSTANCE_SIGNATURE")
-    assert REAL_HYPRLAND_MONITOR(lambda locked: None) is None
-
-
-def test_run_without_logind(monkeypatch, services, monitors, caplog):
-    monkeypatch.setattr(cli, "_system_bus", lambda: None)
-    monkeypatch.setattr(cli, "_sleep_monitor", lambda on_sleep: FakeMonitor(on_sleep, fail=True))
-    assert cli.main(["run"]) == 0
-    assert "cannot blank the screen on suspend" in caplog.text
-
-
-def test_default_sleep_monitor():
-    pytest.importorskip("gi")
-    from minitela.system_gio import SleepMonitor
-
-    assert isinstance(REAL_SLEEP_MONITOR(lambda s: None), SleepMonitor)
-
-
-def test_default_lock_monitor():
-    pytest.importorskip("gi")
-    from minitela.system_gio import LockMonitor
-
-    assert isinstance(REAL_LOCK_MONITOR(lambda locked: None), LockMonitor)
-
-
-def test_run_without_notifications_or_system_bus(monkeypatch, services, caplog):
-    created, _ = services
-    monkeypatch.setattr(cli, "_system_bus", lambda: None)
-    monkeypatch.setattr(cli, "_notification_monitor", lambda push: FakeMonitor(push, fail=True))
-    assert cli.main(["run"]) == 0
-    sources = [s.name for s in created[0].make_sources(cli.Settings())]
-    assert "notifications" not in sources and "battery" not in sources
-    assert "notifications disabled" in caplog.text
-
-
-def test_run_opens_the_requested_port(monkeypatch, services, monitors):
-    created, _ = services
-    opened = []
-    monkeypatch.setattr(cli, "_system_bus", lambda: None)
-    monkeypatch.setattr(cli, "open_device", lambda path=None: opened.append(path))
-    cli.main(["--port", "/dev/ttyACM3", "run"])
-    created[0].open_transport()
-    assert opened == ["/dev/ttyACM3"]
-
-
-def test_system_bus_unavailable(monkeypatch, caplog):
-    pytest.importorskip("gi")
-    from minitela.dbus_gio import GioBus
-
-    def no_bus():
-        raise RuntimeError("no system bus")
-
-    monkeypatch.setattr(GioBus, "system", no_bus)
-    assert cli._system_bus() is None
-    assert "disabled" in caplog.text
-
-
-def test_system_bus():
-    pytest.importorskip("gi")
-    from minitela.dbus_gio import GioBus
-
-    assert isinstance(cli._system_bus(), GioBus)
+def test_run_refuses_a_second_service(monkeypatch, capsys):
+    monkeypatch.setattr(cli, "Runner", lambda port=None: FakeRunner(port, refuse=True))
+    assert cli.main(["run"]) == 1
+    assert "another minitela service is running" in capsys.readouterr().err
 
 
 # --- Control socket ------------------------------------------------------------------------
@@ -728,9 +613,3 @@ def test_next_page_without_the_service(plugged, screen, config_home, current, fo
     screen.numbers[2] = current
     assert cli.main(["next-page"]) == 0
     assert screen.numbers[2] == following
-
-
-def test_run_refuses_a_second_service(monkeypatch, services, monitors, running_service, capsys):
-    monkeypatch.setattr(cli, "_system_bus", lambda: None)
-    assert cli.main(["run"]) == 1
-    assert "another minitela service is running" in capsys.readouterr().err

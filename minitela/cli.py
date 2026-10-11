@@ -9,14 +9,14 @@ from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
-from minitela import __version__, control, hyprland
+from minitela import __version__, control, runner
 from minitela.assets import InvalidPackageError, import_deb, library_dir, load_library
 from minitela.dbus import BusError
 from minitela.device import PAGE_COUNT, Device
 from minitela.protocol import tags
 from minitela.protocol.commands import ProtocolError
-from minitela.service import Service, build_sources
-from minitela.settings import Settings, load_settings, save_settings, settings_path
+from minitela.runner import Runner
+from minitela.settings import Settings, load_settings, save_settings
 from minitela.sources.notifications import NotificationSource
 from minitela.sources.reminder import ReminderSource, ReminderStore
 from minitela.sources.weather import WeatherSource, search_cities
@@ -259,16 +259,10 @@ def _reminder(args: argparse.Namespace) -> int:
     return 0
 
 
-def _notification_monitor(on_notification):
-    from minitela.sources.notifications_gio import NotificationMonitor
-
-    return NotificationMonitor(on_notification)
-
-
 def _notifications(args: argparse.Namespace) -> int:
     """Follow WhatsApp notifications until Ctrl+C (a preview of what the service will do)."""
     source = NotificationSource()
-    monitor = _notification_monitor(source.push)
+    monitor = runner.make_notification_monitor(source.push)
     try:
         monitor.start()
     except BusError as error:
@@ -351,102 +345,23 @@ def _apply_setting(settings: Settings, key: str, value: str) -> None:
         settings.notifications = value == "on"
 
 
-def _system_bus():
-    """The system bus for battery, Wi-Fi and Bluetooth, or None if it cannot be reached."""
-    try:
-        from minitela.dbus_gio import GioBus
-
-        return GioBus.system()
-    except Exception as error:  # no PyGObject, or no system bus
-        log.warning("battery, Wi-Fi and Bluetooth disabled: %s", error)
-        return None
-
-
-def _sleep_monitor(on_sleep):
-    from minitela.system_gio import SleepMonitor
-
-    return SleepMonitor(on_sleep)
-
-
-def _lock_monitor(on_lock):
-    from minitela.system_gio import LockMonitor
-
-    return LockMonitor(on_lock)
-
-
-def _hyprland_lock_monitor(on_lock):
-    """Lock detection for Hyprland sessions (Omarchy), or None elsewhere."""
-    if hyprland.control_socket() is None:
-        return None
-    return hyprland.HyprlandLockMonitor(on_lock)
-
-
-def _start_monitor(make, callback, failure: str):
-    """Start a system event monitor, or log `failure` and return None."""
-    try:
-        monitor = make(callback)
-        if monitor is not None:
-            monitor.start()
-    except (BusError, ImportError, OSError) as error:
-        log.warning("%s: %s", failure, error)
-        return None
-    return monitor
-
-
 def _run(args: argparse.Namespace) -> int:
     """Keep the mini screen updated until Ctrl+C or SIGTERM."""
     if not args.verbose:
         logging.getLogger("minitela").setLevel(logging.INFO)
-    system_bus = _system_bus()
-    notifications: NotificationSource | None = NotificationSource()
-    monitor = None
+    runner = Runner(args.port)
     try:
-        monitor = _notification_monitor(notifications.push)
-        monitor.start()
-    except (BusError, ImportError) as error:
-        log.warning("WhatsApp notifications disabled: %s", error)
-        notifications, monitor = None, None
-    service = Service(
-        lambda: open_device(args.port),
-        lambda settings: build_sources(settings, system_bus, notifications),
-        settings_path(),
-    )
-    system_monitors = [
-        _start_monitor(
-            _sleep_monitor,
-            lambda sleeping: service.set_blanked("sleep", sleeping),
-            "cannot blank the screen on suspend",
-        ),
-        _start_monitor(
-            _lock_monitor,
-            lambda locked: service.set_blanked("lock", locked),
-            "cannot blank the screen on lock",
-        ),
-        _start_monitor(
-            _hyprland_lock_monitor,
-            lambda locked: service.set_blanked("hyprland-lock", locked),
-            "cannot follow Hyprland's lock",
-        ),
-    ]
-    server = control.ControlServer(service.handle_command)
-    try:
-        server.start()
+        runner.start()
     except OSError as error:
-        for running in (monitor, *system_monitors):
-            if running is not None:
-                running.stop()
         return _fail(str(error))
-    signal.signal(signal.SIGTERM, lambda signum, frame: service.stop())
+    signal.signal(signal.SIGTERM, lambda signum, frame: runner.stop())
     log.info("running; press Ctrl+C to stop")
     try:
-        service.run()
+        runner.run()
     except KeyboardInterrupt:
         pass
     finally:
-        server.stop()
-        for running in (monitor, *system_monitors):
-            if running is not None:
-                running.stop()
+        runner.close()
     return 0
 
 
