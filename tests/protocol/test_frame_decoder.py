@@ -1,4 +1,4 @@
-from captures import all_captured_frames
+from captures import official_app_frames
 
 from minitela.protocol.frame import Frame, FrameDecoder
 
@@ -67,8 +67,8 @@ def test_max_length_bounds_false_starts():
     assert decode(false_start + HANDSHAKE.encode()) == []
 
 
-def test_all_captured_frames_as_one_stream():
-    captured = all_captured_frames()
+def test_official_app_frames_as_one_stream():
+    captured = official_app_frames()
     stream = b"".join(captured)
     frames = decode(*(stream[i : i + 7] for i in range(0, len(stream), 7)))
     assert len(frames) == len(captured)

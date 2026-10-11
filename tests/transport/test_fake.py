@@ -9,7 +9,9 @@ from minitela.protocol.commands import (
 )
 from minitela.protocol.frame import Frame
 from minitela.protocol.registers import (
-    parse_register_response,
+    WriteAck,
+    parse_register_values,
+    parse_write_ack,
     read_numbers,
     read_string,
     write_numbers,
@@ -98,21 +100,21 @@ def test_simulated_handshake(transport):
 def test_simulated_number_registers(transport, screen):
     (write,) = write_numbers([(7, 50), (2, 3)])
     reply = transport.request(write, Command.SET_REGISTER.response)
-    assert parse_register_response(reply) == {7: 50, 2: 3}
+    assert parse_write_ack(reply) == WriteAck((7, 2), ok=True)
     assert screen.numbers == {7: 50, 2: 3}
 
     (read,) = read_numbers([2, 99])
     reply = transport.request(read, Command.SET_REGISTER.response)
-    assert parse_register_response(reply) == {2: 3, 99: 0}
+    assert parse_register_values(reply) == {2: 3, 99: 0}
 
 
 def test_simulated_text_registers(transport, screen):
     reply = transport.request(write_string(1082, "80%"), Command.SET_REGISTER.response)
-    assert parse_register_response(reply) == {1082: b"80%"}
+    assert parse_write_ack(reply) == WriteAck((1082,), ok=True)
     assert screen.texts == {1082: b"80%"}
 
-    reply = transport.request(read_string(1082, 32), Command.SET_REGISTER.response)
-    assert parse_register_response(reply) == {1082: b"80%"}
+    reply = transport.request(read_string(1082, 6), Command.SET_REGISTER.response)
+    assert parse_register_values(reply) == {1082: b"80%\0\0\0"}
 
 
 def test_simulated_screen_ignores_other_commands(transport):

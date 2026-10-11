@@ -39,8 +39,7 @@ class FakeTransport(Transport):
 class SimulatedScreen:
     """Responder that behaves like the mini screen for handshakes and registers.
 
-    The reply layouts follow the MiniPanel source; they have not been observed on the real
-    device yet.
+    Reply layouts are the ones observed on the real device (tests/fixtures/device-replies.hex).
     """
 
     def __init__(self, max_packet_length: int = 1024):
@@ -52,27 +51,31 @@ class SimulatedScreen:
         if frame.command == Command.HANDSHAKE:
             return [Frame(Command.HANDSHAKE.response, self.max_packet_length.to_bytes(4))]
         if frame.command == Command.SET_REGISTER:
-            return [self._register_reply(frame.payload)]
+            return [Frame(Command.SET_REGISTER.response, self._register_reply(frame.payload))]
         return []
 
-    def _register_reply(self, payload: bytes) -> Frame:
+    def _register_reply(self, payload: bytes) -> bytes:
         header, body = payload[0], payload[1:]
-        if header & 0xF0 in (0x80, 0xC0):  # numeric write or read
-            count = (header & 0x0F) + 1
-            size = 6 if header & 0xF0 == 0x80 else 2
-            registers = []
-            for i in range(count):
-                entry = body[i * size : (i + 1) * size]
-                register = int.from_bytes(entry[:2])
-                if size == 6:
-                    self.numbers[register] = int.from_bytes(entry[2:])
-                registers.append(register)
-            data = b"".join(r.to_bytes(2) + self.numbers.get(r, 0).to_bytes(4) for r in registers)
-            reply = bytes([count - 1]) + data
-        else:  # text write (0xD0) or read (0xE0)
-            register, length = int.from_bytes(body[:2]), int.from_bytes(body[2:4])
-            if header == 0xD0:
-                self.texts[register] = body[4 : 4 + length]
-            text = self.texts.get(register, b"")
-            reply = bytes([0x30]) + register.to_bytes(2) + len(text).to_bytes(2) + text
-        return Frame(Command.SET_REGISTER.response, reply)
+        count = (header & 0x0F) + 1
+        kind = header & 0xF0
+        if kind == 0x80:  # write numbers
+            entries = [body[i * 6 : i * 6 + 6] for i in range(count)]
+            for entry in entries:
+                self.numbers[int.from_bytes(entry[:2])] = int.from_bytes(entry[2:])
+            return self._ack(header, [entry[:2] for entry in entries])
+        if kind == 0xC0:  # read numbers
+            ids = [int.from_bytes(body[i * 2 : i * 2 + 2]) for i in range(count)]
+            data = b"".join(r.to_bytes(2) + self.numbers.get(r, 0).to_bytes(4) for r in ids)
+            return bytes([count - 1]) + data
+        register, length = body[:2], int.from_bytes(body[2:4])
+        if header == 0xD0:  # write text
+            self.texts[int.from_bytes(register)] = body[4 : 4 + length]
+            return self._ack(header, [register])
+        # read text: the stored value padded with NUL to the requested length
+        text = self.texts.get(int.from_bytes(register), b"")[:length].ljust(length, b"\0")
+        return bytes([0x10]) + register + length.to_bytes(2) + text
+
+    @staticmethod
+    def _ack(header: int, registers: list[bytes]) -> bytes:
+        count = len(registers)
+        return bytes([0x20 | (count - 1), 0, 0]) + b"".join(r + b"\0" for r in registers)

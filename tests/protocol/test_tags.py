@@ -1,7 +1,7 @@
 from datetime import datetime
 
 import pytest
-from captures import all_captured_frames
+from captures import official_app_frames
 
 from minitela.protocol import tags
 from minitela.protocol.frame import FrameDecoder
@@ -27,7 +27,7 @@ def test_captured_registers_are_known():
     # The official app also clears 1142 and 1143, which the factory layout does not have.
     not_in_layout = {1142, 1143}
     known = {register.id for register in REGISTERS.values()}
-    for captured in all_captured_frames():
+    for captured in official_app_frames():
         (frame,) = FrameDecoder().feed(captured)
         register = int.from_bytes(frame.payload[1:3])
         assert register in known | not_in_layout

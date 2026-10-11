@@ -16,6 +16,7 @@ def read_capture(path: Path) -> list[tuple[float, str, bytes]]:
     return frames
 
 
-def all_captured_frames() -> list[bytes]:
-    """Every frame sent by the official app in all fixtures."""
-    return [frame for path in sorted(FIXTURES.glob("*.hex")) for _, _, frame in read_capture(path)]
+def official_app_frames() -> list[bytes]:
+    """Every frame sent by the official app, from all fixtures except our own sessions."""
+    paths = sorted(p for p in FIXTURES.glob("*.hex") if not p.name.startswith("device-"))
+    return [frame for path in paths for _, _, frame in read_capture(path)]

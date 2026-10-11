@@ -1,5 +1,5 @@
 import pytest
-from captures import all_captured_frames
+from captures import official_app_frames
 
 from minitela.protocol.crc import crc16
 from minitela.protocol.frame import Frame
@@ -31,7 +31,7 @@ def test_largest_payload():
     assert encoded[2:4] == bytes.fromhex("7fff")
 
 
-@pytest.mark.parametrize("captured", all_captured_frames(), ids=lambda f: f.hex()[:24])
+@pytest.mark.parametrize("captured", official_app_frames(), ids=lambda f: f.hex()[:24])
 def test_matches_official_app_except_crc(captured):
     # The official app always sends E2 CB as CRC, sometimes with the CRC flag set. Apart from
     # that field and flag, our frames must be identical.

@@ -58,8 +58,9 @@ O app oficial em C++ envia **sempre os bytes fixos `E2 CB`** no campo de CRC, ta
 bit 15 ligado (registrador numérico) quanto desligado (registrador de string). `E2CB` não é o
 CRC desses quadros em nenhuma das variantes comuns de CRC-16 (ARC, MODBUS, CCITT, XMODEM).
 
-**Conclusão**: o dispositivo não valida o CRC. ❓ Confirmar se ele responde normalmente a
-quadros com CRC desligado e `00 00`, que é o que esta implementação vai enviar.
+**Conclusão**: o dispositivo não valida o CRC. Ele responde normalmente a quadros com o CRC
+desligado e `00 00`, que é o que esta implementação envia (`tests/fixtures/device-replies.hex`).
+Nas próprias respostas, ele liga o bit 15 nas de `SET_REGISTER` mas também manda `00 00`.
 
 ## Tipos de comando
 
@@ -99,7 +100,7 @@ O código da resposta é o código do comando **mais** `0x40` (`0x0070` → `0x0
 | Resposta | Conteúdo |
 |---|---|
 | `HANDSHAKE` | `tamanho máximo de pacote (u32)` |
-| `GET_DOWNLOAD_STATUS` | `estado (u8)` `id do arquivo (16 B)` `offset (u32)` |
+| `GET_DOWNLOAD_STATUS` | `estado (u8)` `id do arquivo (16 B)` `offset (u32)`. O dispositivo manda 3 bytes a mais ❓ |
 | `GET_OFFSET` | `offset (u32)` |
 | `REQUEST_DOWNLOAD` | `tamanho máximo de página (u32)` `código (u32)` |
 | `DOWNLOAD_DATA` | `código (u32)` |
@@ -173,12 +174,24 @@ id (u16)  tamanho a ler (u16)
 
 ### Resposta
 
-A resposta a qualquer `SET_REGISTER` traz o valor atual dos registradores envolvidos:
+Observado no dispositivo (firmware `1.10.19_build_2024.09.20_GIFTest`). O código do MiniPanel
+espera outros códigos de função, provavelmente de outro firmware.
 
-| Função na resposta (bits 6-4) | Dados |
-|---|---|
-| `0` (numérico) | repetido `contagem` vezes: `id (u16)` `valor (u32)` |
-| `3` (string) | `id (u16)` `tamanho (u16)` `bytes` |
+| Comando | Cabeçalho da resposta | Dados |
+|---|---|---|
+| Ler números | `0x00 \| (n - 1)` (função 0) | repetido `n` vezes: `id (u16)` `valor (u32)` |
+| Ler string | `0x10` (função 1) | `id (u16)` `tamanho (u16)` `bytes`, completados com `00` até o tamanho pedido |
+| Escrever (números ou string) | `0x20 \| (n - 1)` (função 2) | `00 00`, depois repetido `n` vezes: `id (u16)` `00` |
+
+Exemplo, confirmação da escrita do brilho e da página:
+
+```
+41 48 | 80 0b | 00 d0 | 21 00 00 00 07 00 00 02 00 | 00 00 | 4d 49
+```
+
+Os bytes `00` da confirmação são de status. Eles vieram zerados até para registradores que não
+existem (9999), então o dispositivo não valida os ids e a posição exata de cada status não pode
+ser deduzida. Ler um registrador de string inexistente devolve bytes arbitrários.
 
 ## Comportamento dos apps oficiais
 

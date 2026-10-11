@@ -5,6 +5,7 @@ count - 1 (bits 3-0). See docs/protocol.md.
 """
 
 from collections.abc import Iterable
+from dataclasses import dataclass
 
 from minitela.protocol.commands import Command, ProtocolError
 from minitela.protocol.frame import Frame
@@ -16,8 +17,11 @@ _READ_NUMBERS = 0xC0
 _WRITE_STRING = 0xD0
 _READ_STRING = 0xE0
 
+# Reply functions observed on the device (firmware 1.10.19). The MiniPanel source expects
+# other codes, for a different firmware.
 _REPLY_NUMBERS = 0
-_REPLY_STRING = 3
+_REPLY_TEXT = 1
+_REPLY_WRITE = 2
 
 
 def _batches(items: list, size: int = MAX_BATCH) -> Iterable[list]:
@@ -71,23 +75,61 @@ def read_string(register: int, length: int) -> Frame:
     return Frame(Command.SET_REGISTER, payload)
 
 
-def parse_register_response(frame: Frame) -> dict[int, int | bytes]:
-    """Current values reported by the device after any SET_REGISTER command."""
+@dataclass(frozen=True)
+class WriteAck:
+    """The device's acknowledgement of a register write.
+
+    It carries the written register IDs plus status bytes that were always zero, even for
+    registers that do not exist, so `ok` only flags an unexpected non-zero status.
+    """
+
+    registers: tuple[int, ...]
+    ok: bool
+
+
+def _check_reply(frame: Frame) -> tuple[int, int, bytes]:
     if frame.command != Command.SET_REGISTER.response:
         raise ProtocolError(f"not a register response: 0x{frame.command:04x}")
     if not frame.payload:
         raise ProtocolError("empty register response")
     header, data = frame.payload[0], frame.payload[1:]
-    function = (header >> 4) & 0x07
+    return (header >> 4) & 0x07, (header & 0x0F) + 1, data
+
+
+def _too_short(frame: Frame) -> ProtocolError:
+    return ProtocolError(f"register response too short: {frame.payload.hex()}")
+
+
+def parse_register_values(frame: Frame) -> dict[int, int | bytes]:
+    """Values the device returns for a register read.
+
+    Text values are the raw bytes, padded with NUL up to the requested length.
+    """
+    function, count, data = _check_reply(frame)
     if function == _REPLY_NUMBERS:
-        count = (header & 0x0F) + 1
         if len(data) < count * 6:
-            raise ProtocolError(f"register response too short: {frame.payload.hex()}")
+            raise _too_short(frame)
         entries = (data[i * 6 : i * 6 + 6] for i in range(count))
         return {int.from_bytes(e[:2]): int.from_bytes(e[2:]) for e in entries}
-    if function == _REPLY_STRING:
+    if function == _REPLY_TEXT:
         if len(data) < 4:
-            raise ProtocolError(f"register response too short: {frame.payload.hex()}")
+            raise _too_short(frame)
         length = int.from_bytes(data[2:4])
         return {int.from_bytes(data[:2]): data[4 : 4 + length]}
-    raise ProtocolError(f"unknown register response function {function}")
+    raise ProtocolError(f"not a register read reply (function {function})")
+
+
+def parse_write_ack(frame: Frame) -> WriteAck:
+    """Acknowledgement of a register write: two status bytes, then ID and status per register.
+
+    Seen on the device as `00 00 | id 00 | id 00 ...`. The exact split of the status bytes
+    is unknown (they were always zero), but the IDs always sit at offset 2 + 3 * n.
+    """
+    function, count, data = _check_reply(frame)
+    if function != _REPLY_WRITE:
+        raise ProtocolError(f"not a register write reply (function {function})")
+    if len(data) < 2 + count * 3:
+        raise _too_short(frame)
+    registers = tuple(int.from_bytes(data[2 + i * 3 : 4 + i * 3]) for i in range(count))
+    statuses = [data[0], data[1], *(data[4 + i * 3] for i in range(count))]
+    return WriteAck(registers, ok=not any(statuses))

@@ -1,11 +1,13 @@
 import pytest
-from captures import all_captured_frames
+from captures import official_app_frames
 
 from minitela.protocol.commands import Command, ProtocolError
 from minitela.protocol.frame import Frame, FrameDecoder
 from minitela.protocol.registers import (
+    WriteAck,
     encode_text,
-    parse_register_response,
+    parse_register_values,
+    parse_write_ack,
     read_numbers,
     read_string,
     write_numbers,
@@ -72,7 +74,7 @@ def _decode(captured: bytes) -> Frame:
     return frame
 
 
-@pytest.mark.parametrize("captured", all_captured_frames(), ids=lambda f: f.hex()[:24])
+@pytest.mark.parametrize("captured", official_app_frames(), ids=lambda f: f.hex()[:24])
 def test_matches_official_app(captured):
     frame = _decode(captured)
     assert frame.command == Command.SET_REGISTER
@@ -90,12 +92,21 @@ def response(payload_hex: str) -> Frame:
     return Frame(Command.SET_REGISTER.response, bytes.fromhex(payload_hex))
 
 
-def test_parse_numeric_response():
-    assert parse_register_response(response("01 0007 00000064 0002 00000001")) == {7: 100, 2: 1}
+def test_parse_numeric_values():
+    assert parse_register_values(response("01 0002 00000001 0007 0000004b")) == {2: 1, 7: 75}
 
 
-def test_parse_string_response():
-    assert parse_register_response(response("30 000c 0003 312e30")) == {12: b"1.0"}
+def test_parse_text_value_keeps_padding():
+    assert parse_register_values(response("10 000c 0004 312e3000")) == {12: b"1.0\0"}
+
+
+def test_parse_write_ack():
+    assert parse_write_ack(response("21 0000 0007 00 0002 00")) == WriteAck((7, 2), ok=True)
+
+
+@pytest.mark.parametrize("payload_hex", ["20 0100 0007 00", "20 0001 0007 00", "20 0000 0007 01"])
+def test_parse_write_ack_with_status(payload_hex):
+    assert parse_write_ack(response(payload_hex)) == WriteAck((7,), ok=False)
 
 
 @pytest.mark.parametrize(
@@ -103,15 +114,22 @@ def test_parse_string_response():
     [
         "",  # no header
         "01 0007 00000064",  # announces two entries, carries one
-        "30 000c",  # string without length
+        "10 000c",  # text without length
+        "20 0000 0007 00",  # a write ack is not a value reply
         "50 0000",  # unknown function
     ],
 )
-def test_parse_malformed_response(payload_hex):
+def test_parse_malformed_values(payload_hex):
     with pytest.raises(ProtocolError):
-        parse_register_response(response(payload_hex))
+        parse_register_values(response(payload_hex))
+
+
+@pytest.mark.parametrize("payload_hex", ["21 0000 0007 00", "00 0007 0000004b", ""])
+def test_parse_malformed_write_ack(payload_hex):
+    with pytest.raises(ProtocolError):
+        parse_write_ack(response(payload_hex))
 
 
 def test_parse_wrong_command():
     with pytest.raises(ProtocolError):
-        parse_register_response(Frame(Command.HANDSHAKE.response, b"\x00\x00\x04\x00"))
+        parse_register_values(Frame(Command.HANDSHAKE.response, b"\x00\x00\x04\x00"))

@@ -13,8 +13,8 @@ Linhas começando com `#` são comentários. As demais têm três campos:
 
 A direção é `>` do computador para o dispositivo e `<` do dispositivo para o computador.
 
-O app oficial **nunca lê a porta serial**, então todas as linhas são `>`. As respostas do
-dispositivo ainda não foram observadas.
+O app oficial **nunca lê a porta serial**, então as capturas dele só têm linhas `>`. As
+respostas do dispositivo estão em `device-replies.hex`, gravado com o nosso próprio código.
 
 ## Arquivos
 
@@ -26,6 +26,10 @@ dispositivo ainda não foram observadas.
 | `reminder.hex` | Gravação de um lembrete (com e sem quebras de linha) |
 | `clock.hex` | Atualização de data e hora a cada minuto |
 | `refresh-after-reconnect.hex` | Reenvio completo depois de reabrir a porta |
+| `device-replies.hex` | **Nossas** requisições e as respostas do dispositivo: handshake, estado de download, leitura de versão e registradores, confirmações de escrita |
+
+Arquivos com prefixo `device-` são sessões do nosso código, não do app oficial, e ficam fora
+dos testes que comparam com o app oficial.
 
 ## Como reproduzir
 
