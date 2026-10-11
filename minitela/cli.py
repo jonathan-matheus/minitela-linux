@@ -9,7 +9,7 @@ from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
-from minitela import __version__
+from minitela import __version__, hyprland
 from minitela.assets import InvalidPackageError, import_deb, library_dir, load_library
 from minitela.dbus import BusError
 from minitela.device import PAGE_COUNT, Device
@@ -339,12 +339,20 @@ def _lock_monitor(on_lock):
     return LockMonitor(on_lock)
 
 
+def _hyprland_lock_monitor(on_lock):
+    """Lock detection for Hyprland sessions (Omarchy), or None elsewhere."""
+    if hyprland.control_socket() is None:
+        return None
+    return hyprland.HyprlandLockMonitor(on_lock)
+
+
 def _start_monitor(make, callback, failure: str):
     """Start a system event monitor, or log `failure` and return None."""
     try:
         monitor = make(callback)
-        monitor.start()
-    except (BusError, ImportError) as error:
+        if monitor is not None:
+            monitor.start()
+    except (BusError, ImportError, OSError) as error:
         log.warning("%s: %s", failure, error)
         return None
     return monitor
@@ -378,6 +386,11 @@ def _run(args: argparse.Namespace) -> int:
             _lock_monitor,
             lambda locked: service.set_blanked("lock", locked),
             "cannot blank the screen on lock",
+        ),
+        _start_monitor(
+            _hyprland_lock_monitor,
+            lambda locked: service.set_blanked("hyprland-lock", locked),
+            "cannot follow Hyprland's lock",
         ),
     ]
     signal.signal(signal.SIGTERM, lambda signum, frame: service.stop())

@@ -6,7 +6,7 @@ from dataclasses import asdict
 import pytest
 import serial
 
-from minitela import __version__, cli
+from minitela import __version__, cli, hyprland
 from minitela.device import Device
 from minitela.transport import connection
 from minitela.transport.discovery import SerialDevice
@@ -16,6 +16,7 @@ MINITELA = SerialDevice("/dev/ttyACM0", "0324", "0324", "sxw-admin_CDC_DEMO")
 # Replaced in every test by the system_monitors fixture.
 REAL_SLEEP_MONITOR = cli._sleep_monitor
 REAL_LOCK_MONITOR = cli._lock_monitor
+REAL_HYPRLAND_MONITOR = cli._hyprland_lock_monitor
 
 
 @pytest.fixture(autouse=True)
@@ -543,7 +544,7 @@ def services(monkeypatch, config_home):
 @pytest.fixture(autouse=True)
 def system_monitors(monkeypatch):
     """Never touch the real logind or screen saver in tests: {"sleep": [...], "lock": [...]}."""
-    created = {"sleep": [], "lock": []}
+    created = {"sleep": [], "lock": [], "hyprland": []}
 
     def factory(kind):
         def make(callback):
@@ -554,6 +555,7 @@ def system_monitors(monkeypatch):
 
     monkeypatch.setattr(cli, "_sleep_monitor", factory("sleep"))
     monkeypatch.setattr(cli, "_lock_monitor", factory("lock"))
+    monkeypatch.setattr(cli, "_hyprland_lock_monitor", factory("hyprland"))
     return created
 
 
@@ -589,10 +591,28 @@ def test_run_blanks_on_suspend_and_lock(monkeypatch, services, monitors, system_
     monkeypatch.setattr(cli, "_system_bus", lambda: None)
     cli.main(["run"])
     (sleep_monitor,), (lock_monitor,) = system_monitors["sleep"], system_monitors["lock"]
+    (hyprland_monitor,) = system_monitors["hyprland"]
     sleep_monitor.callback(True)
     lock_monitor.callback(True)
-    assert created[0].blanked == [("sleep", True), ("lock", True)]
-    assert not sleep_monitor.running and not lock_monitor.running
+    hyprland_monitor.callback(True)
+    assert created[0].blanked == [("sleep", True), ("lock", True), ("hyprland-lock", True)]
+    assert not any(m.running for m in (sleep_monitor, lock_monitor, hyprland_monitor))
+
+
+def test_run_outside_hyprland(monkeypatch, services, monitors, caplog):
+    monkeypatch.setattr(cli, "_system_bus", lambda: None)
+    monkeypatch.setattr(cli, "_hyprland_lock_monitor", lambda on_lock: None)
+    assert cli.main(["run"]) == 0
+    assert "Hyprland" not in caplog.text
+
+
+def test_default_hyprland_monitor(monkeypatch, tmp_path):
+    monkeypatch.setenv("HYPRLAND_INSTANCE_SIGNATURE", "abc")
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path))
+    monitor = REAL_HYPRLAND_MONITOR(lambda locked: None)
+    assert isinstance(monitor, hyprland.HyprlandLockMonitor)
+    monkeypatch.delenv("HYPRLAND_INSTANCE_SIGNATURE")
+    assert REAL_HYPRLAND_MONITOR(lambda locked: None) is None
 
 
 def test_run_without_logind(monkeypatch, services, monitors, caplog):
