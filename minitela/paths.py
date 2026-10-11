@@ -14,3 +14,8 @@ def data_dir() -> Path:
 def cache_dir() -> Path:
     base = os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache"
     return Path(base) / APP_DIR
+
+
+def config_dir() -> Path:
+    base = os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config"
+    return Path(base) / APP_DIR

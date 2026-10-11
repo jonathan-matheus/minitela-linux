@@ -438,3 +438,59 @@ def test_default_notification_monitor():
     from minitela.sources.notifications_gio import NotificationMonitor
 
     assert isinstance(cli._notification_monitor(lambda n: None), NotificationMonitor)
+
+
+@pytest.fixture
+def config_home(monkeypatch, tmp_path, open_meteo):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    return tmp_path / "config"
+
+
+def test_config_show_defaults(config_home, capsys):
+    assert cli.main(["config"]) == 0
+    out = capsys.readouterr().out
+    assert "brightness     100" in out
+    assert "city           (not chosen)" in out
+    assert "pages          1 (whatsapp), 2 (reminder)" in out
+    assert "rotation       off" in out
+    assert "notifications  on" in out
+
+
+@pytest.mark.parametrize(
+    ("argv", "line"),
+    [
+        (["brightness", "40"], "brightness     40"),
+        (["city", "Recife"], "city           Recife"),
+        (["pages", "weather, 5,1"], "pages          4 (weather), 5 (gif1), 1 (whatsapp)"),
+        (["rotation", "20"], "rotation       20 s"),
+        (["notifications", "off"], "notifications  off"),
+    ],
+)
+def test_config_set(config_home, capsys, argv, line):
+    assert cli.main(["config", *argv]) == 0
+    assert line in capsys.readouterr().out
+    assert cli.main(["config"]) == 0
+    assert line in capsys.readouterr().out  # persisted
+
+
+def test_config_clear_city(config_home, capsys):
+    cli.main(["config", "city", "Recife"])
+    assert cli.main(["config", "city", ""]) == 0
+    assert "(not chosen)" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    ("argv", "message"),
+    [
+        (["brightness"], "missing value"),
+        (["brightness", "150"], "between 0 and 100"),
+        (["brightness", "x"], "between 0 and 100"),
+        (["city", "nowhere"], "no city found"),
+        (["pages", "1,nope"], "unknown page"),
+        (["rotation", "-1"], "number of seconds"),
+        (["notifications", "maybe"], "'on' or 'off'"),
+    ],
+)
+def test_config_invalid(config_home, capsys, argv, message):
+    assert cli.main(["config", *argv]) == 1
+    assert message in capsys.readouterr().err

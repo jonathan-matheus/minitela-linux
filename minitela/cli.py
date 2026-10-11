@@ -14,6 +14,7 @@ from minitela.dbus import BusError
 from minitela.device import PAGE_COUNT, Device
 from minitela.protocol import tags
 from minitela.protocol.commands import ProtocolError
+from minitela.settings import Settings, load_settings, save_settings
 from minitela.sources.notifications import NotificationSource
 from minitela.sources.reminder import ReminderSource, ReminderStore
 from minitela.sources.weather import WeatherSource, search_cities
@@ -258,6 +259,59 @@ def _notifications(args: argparse.Namespace) -> int:
             device.transport.close()
 
 
+CONFIG_KEYS = ("brightness", "city", "pages", "rotation", "notifications")
+
+
+def _show_settings(settings: Settings) -> None:
+    city = settings.city.label if settings.city else "(not chosen)"
+    rotation = f"{settings.rotation_seconds} s" if settings.rotation_seconds else "off"
+    pages = ", ".join(f"{page} ({tags.page_name(page)})" for page in settings.pages)
+    print(f"brightness     {settings.brightness}")
+    print(f"city           {city}")
+    print(f"pages          {pages}")
+    print(f"rotation       {rotation}")
+    print(f"notifications  {'on' if settings.notifications else 'off'}")
+
+
+def _config(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    if args.key is None:
+        _show_settings(settings)
+        return 0
+    if args.value is None:
+        return _fail(f"missing value for {args.key}")
+    try:
+        _apply_setting(settings, args.key, args.value)
+    except (ValueError, argparse.ArgumentTypeError) as error:
+        return _fail(str(error))
+    save_settings(settings)
+    _show_settings(settings)
+    return 0
+
+
+def _apply_setting(settings: Settings, key: str, value: str) -> None:
+    if key == "brightness":
+        settings.brightness = _percent(value)
+    elif key == "city":
+        if not value:
+            settings.city = None
+            return
+        cities = search_cities(value)
+        if not cities:
+            raise ValueError(f"no city found for {value!r}")
+        settings.city = cities[0]
+    elif key == "pages":
+        settings.pages = [_page_number(page.strip()) for page in value.split(",")]
+    elif key == "rotation":
+        if not value.isdigit():
+            raise ValueError("rotation must be a number of seconds (0 turns it off)")
+        settings.rotation_seconds = int(value)
+    else:
+        if value not in ("on", "off"):
+            raise ValueError("notifications must be 'on' or 'off'")
+        settings.notifications = value == "on"
+
+
 def _page_number(value: str) -> int:
     """A page number or name (whatsapp, reminder, system_info, weather, gif1...)."""
     names = ", ".join(page.name.lower() for page in tags.Page)
@@ -271,10 +325,9 @@ def _page_number(value: str) -> int:
 
 
 def _percent(value: str) -> int:
-    number = int(value)
-    if not 0 <= number <= 100:
+    if not value.isdigit() or not 0 <= int(value) <= 100:
         raise argparse.ArgumentTypeError("brightness must be between 0 and 100")
-    return number
+    return int(value)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -335,6 +388,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--send", action="store_true", help="also show them on the mini screen"
     )
     notifications.set_defaults(handler=_notifications)
+    config = subcommands.add_parser("config", help="show or change the settings")
+    config.add_argument("key", nargs="?", choices=CONFIG_KEYS)
+    config.add_argument("value", nargs="?")
+    config.set_defaults(handler=_config)
     return parser
 
 
