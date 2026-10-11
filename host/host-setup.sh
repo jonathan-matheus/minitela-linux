@@ -51,8 +51,9 @@ need_root() {
 }
 
 reload() {
-    $UDEVADM control --reload
+    # Compile the hwdb before reloading udev, so udevd loads the new database.
     $HWDB update
+    $UDEVADM control --reload
     $UDEVADM trigger --action=change --subsystem-match=tty --sysname-match='ttyACM*'
     $UDEVADM trigger --action=change --subsystem-match=input
 }

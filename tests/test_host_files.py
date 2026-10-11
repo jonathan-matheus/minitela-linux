@@ -99,8 +99,9 @@ def test_install(setup):
     assert hwdb.read_text() == (HOST / "70-minitela-keyboard.hwdb").read_text()
     assert oct(rules.stat().st_mode & 0o777) == "0o644"
     calls = setup.calls.read_text().splitlines()
-    assert calls[0] == "udevadm control --reload"
-    assert calls[1] == "systemd-hwdb update"
+    # The hwdb must be compiled before udev reloads, or udevd keeps the old database.
+    assert calls[0] == "systemd-hwdb update"
+    assert calls[1] == "udevadm control --reload"
     assert "--sysname-match=ttyACM*" in calls[2]
     assert "Note:" not in result.stdout
 
