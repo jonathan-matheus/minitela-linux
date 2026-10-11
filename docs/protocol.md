@@ -63,7 +63,8 @@ quadros com CRC desligado e `00 00`, que é o que esta implementação vai envia
 
 ## Tipos de comando
 
-A resposta a um comando tem o código do comando com o bit 6 ligado (`código | 0x40`).
+O código da resposta é o código do comando **mais** `0x40` (`0x0070` → `0x00B0`, `0x0080` →
+`0x00C0`). Não é um bit: em `0x0070` e `0x0071` o bit 6 já está ligado.
 
 | Código | Comando | Resposta | Uso |
 |---|---|---|---|
