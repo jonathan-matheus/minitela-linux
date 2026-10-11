@@ -2,6 +2,7 @@
 
 import argparse
 import logging
+import signal
 import sys
 import time
 from collections.abc import Callable
@@ -14,7 +15,8 @@ from minitela.dbus import BusError
 from minitela.device import PAGE_COUNT, Device
 from minitela.protocol import tags
 from minitela.protocol.commands import ProtocolError
-from minitela.settings import Settings, load_settings, save_settings
+from minitela.service import Service, build_sources
+from minitela.settings import Settings, load_settings, save_settings, settings_path
 from minitela.sources.notifications import NotificationSource
 from minitela.sources.reminder import ReminderSource, ReminderStore
 from minitela.sources.weather import WeatherSource, search_cities
@@ -26,6 +28,8 @@ from minitela.transport.connection import (
 )
 from minitela.transport.discovery import find_minitela
 from minitela.upload import TextureUpload
+
+log = logging.getLogger("minitela.cli")
 
 
 def _probe(args: argparse.Namespace) -> int:
@@ -312,6 +316,47 @@ def _apply_setting(settings: Settings, key: str, value: str) -> None:
         settings.notifications = value == "on"
 
 
+def _system_bus():
+    """The system bus for battery, Wi-Fi and Bluetooth, or None if it cannot be reached."""
+    try:
+        from minitela.dbus_gio import GioBus
+
+        return GioBus.system()
+    except Exception as error:  # no PyGObject, or no system bus
+        log.warning("battery, Wi-Fi and Bluetooth disabled: %s", error)
+        return None
+
+
+def _run(args: argparse.Namespace) -> int:
+    """Keep the mini screen updated until Ctrl+C or SIGTERM."""
+    if not args.verbose:
+        logging.getLogger("minitela").setLevel(logging.INFO)
+    system_bus = _system_bus()
+    notifications: NotificationSource | None = NotificationSource()
+    monitor = None
+    try:
+        monitor = _notification_monitor(notifications.push)
+        monitor.start()
+    except (BusError, ImportError) as error:
+        log.warning("WhatsApp notifications disabled: %s", error)
+        notifications, monitor = None, None
+    service = Service(
+        lambda: open_device(args.port),
+        lambda settings: build_sources(settings, system_bus, notifications),
+        settings_path(),
+    )
+    signal.signal(signal.SIGTERM, lambda signum, frame: service.stop())
+    log.info("running; press Ctrl+C to stop")
+    try:
+        service.run()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        if monitor is not None:
+            monitor.stop()
+    return 0
+
+
 def _page_number(value: str) -> int:
     """A page number or name (whatsapp, reminder, system_info, weather, gif1...)."""
     names = ", ".join(page.name.lower() for page in tags.Page)
@@ -392,6 +437,8 @@ def build_parser() -> argparse.ArgumentParser:
     config.add_argument("key", nargs="?", choices=CONFIG_KEYS)
     config.add_argument("value", nargs="?")
     config.set_defaults(handler=_config)
+    run = subcommands.add_parser("run", help="keep the mini screen updated (Ctrl+C to stop)")
+    run.set_defaults(handler=_run)
     return parser
 
 
@@ -405,7 +452,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.WARNING,
-        format="%(name)s: %(message)s",
+        format="%(asctime)s %(name)s: %(message)s",
+        datefmt="%H:%M:%S",
     )
     handler: Callable[[argparse.Namespace], int] | None = getattr(args, "handler", None)
     if handler is None:

@@ -95,7 +95,7 @@ def ack_for(register: bytes, status: int = 0) -> Frame:
 
 
 def test_write_acknowledged_with_status(caplog):
-    caplog.set_level("DEBUG")
+    caplog.set_level("DEBUG", logger="minitela.device")
     device = Device(FakeTransport(lambda frame: [ack_for(b"\x00\x07", 0x20)]), timeout=0.05)
     device.set_brightness(50)
     assert "status" in caplog.text

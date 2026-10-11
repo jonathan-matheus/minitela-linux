@@ -1,5 +1,6 @@
 import errno
 import json
+import logging
 from dataclasses import asdict
 
 import pytest
@@ -12,6 +13,15 @@ from minitela.transport.discovery import SerialDevice
 from minitela.transport.fake import FakeTransport, SimulatedScreen
 
 MINITELA = SerialDevice("/dev/ttyACM0", "0324", "0324", "sxw-admin_CDC_DEMO")
+
+
+@pytest.fixture(autouse=True)
+def restore_log_level():
+    """'minitela run' raises the package's log level; keep that from leaking into other tests."""
+    logger = logging.getLogger("minitela")
+    level = logger.level
+    yield
+    logger.setLevel(level)
 
 
 def test_version(capsys):
@@ -494,3 +504,94 @@ def test_config_clear_city(config_home, capsys):
 def test_config_invalid(config_home, capsys, argv, message):
     assert cli.main(["config", *argv]) == 1
     assert message in capsys.readouterr().err
+
+
+class FakeService:
+    def __init__(self, open_transport, make_sources, settings_path):
+        self.open_transport, self.make_sources = open_transport, make_sources
+        self.settings_path = settings_path
+        self.stopped = False
+
+    def run(self):
+        raise KeyboardInterrupt
+
+    def stop(self):
+        self.stopped = True
+
+
+@pytest.fixture
+def services(monkeypatch, config_home):
+    """Replaces the service: returns the instances created, and the signal handlers."""
+    created = []
+    handlers = {}
+    monkeypatch.setattr(
+        cli, "Service", lambda *args: created.append(FakeService(*args)) or created[-1]
+    )
+    monkeypatch.setattr(cli.signal, "signal", lambda sig, handler: handlers.update({sig: handler}))
+    return created, handlers
+
+
+@pytest.fixture
+def monitors(monkeypatch):
+    created = []
+
+    def make(push):
+        created.append(FakeMonitor(push))
+        return created[-1]
+
+    monkeypatch.setattr(cli, "_notification_monitor", make)
+    return created
+
+
+def test_run(monkeypatch, services, monitors, caplog):
+    caplog.set_level("INFO")
+    created, handlers = services
+    monkeypatch.setattr(cli, "_system_bus", lambda: "system bus")
+    assert cli.main(["run"]) == 0
+    (service,) = created
+    sources = [s.name for s in service.make_sources(cli.Settings())]
+    assert "battery" in sources and "notifications" in sources
+    assert service.settings_path.name == "settings.json"
+    assert not monitors[0].running  # stopped on exit
+    handlers[cli.signal.SIGTERM](15, None)
+    assert service.stopped
+    assert "running" in caplog.text
+
+
+def test_run_without_notifications_or_system_bus(monkeypatch, services, caplog):
+    created, _ = services
+    monkeypatch.setattr(cli, "_system_bus", lambda: None)
+    monkeypatch.setattr(cli, "_notification_monitor", lambda push: FakeMonitor(push, fail=True))
+    assert cli.main(["run"]) == 0
+    sources = [s.name for s in created[0].make_sources(cli.Settings())]
+    assert "notifications" not in sources and "battery" not in sources
+    assert "notifications disabled" in caplog.text
+
+
+def test_run_opens_the_requested_port(monkeypatch, services, monitors):
+    created, _ = services
+    opened = []
+    monkeypatch.setattr(cli, "_system_bus", lambda: None)
+    monkeypatch.setattr(cli, "open_device", lambda path=None: opened.append(path))
+    cli.main(["--port", "/dev/ttyACM3", "run"])
+    created[0].open_transport()
+    assert opened == ["/dev/ttyACM3"]
+
+
+def test_system_bus_unavailable(monkeypatch, caplog):
+    pytest.importorskip("gi")
+    from minitela.dbus_gio import GioBus
+
+    def no_bus():
+        raise RuntimeError("no system bus")
+
+    monkeypatch.setattr(GioBus, "system", no_bus)
+    assert cli._system_bus() is None
+    assert "disabled" in caplog.text
+
+
+def test_system_bus():
+    pytest.importorskip("gi")
+    from minitela.dbus_gio import GioBus
+
+    assert isinstance(cli._system_bus(), GioBus)
