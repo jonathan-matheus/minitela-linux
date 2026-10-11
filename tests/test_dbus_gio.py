@@ -3,6 +3,7 @@
 import shutil
 
 import pytest
+from private_bus import private_bus
 
 gi = pytest.importorskip("gi")
 gi.require_version("Gio", "2.0")
@@ -18,18 +19,16 @@ pytestmark = pytest.mark.skipif(not shutil.which("dbus-daemon"), reason="needs d
 
 @pytest.fixture(scope="module")
 def bus():
-    test_bus = Gio.TestDBus.new(Gio.TestDBusFlags.NONE)
-    test_bus.up()
-    connection = Gio.DBusConnection.new_for_address_sync(
-        test_bus.get_bus_address(),
-        Gio.DBusConnectionFlags.AUTHENTICATION_CLIENT
-        | Gio.DBusConnectionFlags.MESSAGE_BUS_CONNECTION,
-        None,
-        None,
-    )
-    yield GioBus(connection)
-    connection.close_sync(None)
-    test_bus.down()
+    with private_bus() as address:
+        connection = Gio.DBusConnection.new_for_address_sync(
+            address,
+            Gio.DBusConnectionFlags.AUTHENTICATION_CLIENT
+            | Gio.DBusConnectionFlags.MESSAGE_BUS_CONNECTION,
+            None,
+            None,
+        )
+        yield GioBus(connection)
+        connection.close_sync(None)
 
 
 def test_call(bus):

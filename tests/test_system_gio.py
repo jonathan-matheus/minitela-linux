@@ -6,6 +6,7 @@ import shutil
 import threading
 
 import pytest
+from private_bus import private_bus
 
 gi = pytest.importorskip("gi")
 gi.require_version("Gio", "2.0")
@@ -127,10 +128,8 @@ class FakeLogind:
 
 @pytest.fixture
 def bus():
-    test_bus = Gio.TestDBus.new(Gio.TestDBusFlags.NONE)
-    test_bus.up()
-    yield test_bus.get_bus_address()
-    test_bus.down()
+    with private_bus() as address:
+        yield address
 
 
 @pytest.fixture
@@ -232,10 +231,8 @@ def test_system_bus_by_default(monkeypatch, bus, logind):
 
 @pytest.fixture
 def session_bus():
-    test_bus = Gio.TestDBus.new(Gio.TestDBusFlags.NONE)
-    test_bus.up()
-    yield test_bus.get_bus_address()
-    test_bus.down()
+    with private_bus() as address:
+        yield address
 
 
 @pytest.fixture
