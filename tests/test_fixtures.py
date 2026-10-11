@@ -1,21 +1,9 @@
 """Sanity checks for the captured traffic fixtures."""
 
-from pathlib import Path
-
 import pytest
+from captures import FIXTURES, read_capture
 
-FIXTURES = Path(__file__).parent / "fixtures"
 HEX_FILES = sorted(FIXTURES.glob("*.hex"))
-
-
-def read_frames(path: Path) -> list[tuple[float, str, bytes]]:
-    frames = []
-    for line in path.read_text().splitlines():
-        if not line or line.startswith("#"):
-            continue
-        elapsed, direction, data = line.split()
-        frames.append((float(elapsed), direction, bytes.fromhex(data)))
-    return frames
 
 
 def test_fixtures_exist():
@@ -24,7 +12,7 @@ def test_fixtures_exist():
 
 @pytest.mark.parametrize("path", HEX_FILES, ids=lambda p: p.name)
 def test_frames_are_well_formed(path):
-    frames = read_frames(path)
+    frames = read_capture(path)
     assert frames
     times = [elapsed for elapsed, _, _ in frames]
     assert times == sorted(times)
