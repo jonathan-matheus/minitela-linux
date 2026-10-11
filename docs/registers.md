@@ -106,17 +106,17 @@ registradores e envia a data como texto no registrador 2006.
 | 1082 | str 32 | `Battery_Percent` | SystemInfo | `CheckSystem` | Porcentagem da bateria com `%`: `"100%"` |
 | 1083 | str 32 | `Wifi_SSID` | SystemInfo | `CheckSystem` | Nome da rede Wi-Fi, cortado em 9 caracteres + `...` quando é maior; `"Desconectado"` sem rede |
 | 1085 | str 32 | `BT_Name` | SystemInfo | `CheckSystem` | Dispositivo Bluetooth conectado; `"Desconectado"` sem dispositivo |
-| 1150 | num | `Battery_Type` | SystemInfo | `CheckSystem` | Ícone da bateria, 0 a 3 (ícones `bat0` a `bat3`); `3` com 100%. ❓ Faixas dos outros valores |
+| 1150 | num | `Battery_Type` | SystemInfo | `CheckSystem` | Ícone da bateria: 0 (1 barra, vermelho) a 3 (4 barras, verde); `3` com 100%. ❓ Faixas usadas pelo app oficial |
 | 1090 | str 100 | `Reminder1` | Reminder | `GetTaskFromFile`, `on_button_task_pressed` | Texto do lembrete, pode ter `\n`. O app limpa (`" "`) antes de gravar |
 | 2006 | str 32 | `dateHour` | várias | `UpdateDateInfo` | Data e hora `"DD/MM HH:MM"`, enviada uma vez por minuto: `"11/10 02:21"` |
 | 2027 | str 32 | `city` | Weather | `SendWeatherToHardware` | Nome da cidade |
-| 1110 | num | `Weather_1_Type` | Weather | `SendWeatherToHardware` | Ícone do clima de hoje ❓ valores |
-| 2030 | str 32 | `currentTemp` | Weather | `SendWeatherToHardware` | Temperatura atual ❓ formato |
+| 1110 | num | `Weather_1_Type` | Weather | `SendWeatherToHardware` | Ícone do clima de hoje (tabela abaixo) |
+| 2030 | str 32 | `currentTemp` | Weather | `SendWeatherToHardware` | Mínima e máxima de hoje: `"25°/26°"` |
 | 1115 | num | `Weather_2_Type` | Weather | `SendWeatherToHardware` | Ícone da previsão 1 |
-| 2031 | str 32 | `forecastTemp1` | Weather | `SendWeatherToHardware` | Temperatura da previsão 1 |
-| 1119 | str 32 | `Weather_2_Temp_Desc` | Weather | `SendWeatherToHardware` | Rótulo da previsão 1 ❓ (dia da semana?) |
+| 2031 | str 32 | `forecastTemp1` | Weather | `SendWeatherToHardware` | Mínima e máxima da previsão 1 |
+| 1119 | str 32 | `Weather_2_Temp_Desc` | Weather | `SendWeatherToHardware` | Rótulo da previsão 1: `"Sáb 29"` |
 | 1120 | num | `Weather_3_Type` | Weather | `SendWeatherToHardware` | Ícone da previsão 2 |
-| 2032 | str 32 | `forecastTemp2` | Weather | `SendWeatherToHardware` | Temperatura da previsão 2 |
+| 2032 | str 32 | `forecastTemp2` | Weather | `SendWeatherToHardware` | Mínima e máxima da previsão 2 |
 | 1124 | str 32 | `Weather_3_Temp_Desc` | Weather | `SendWeatherToHardware` | Rótulo da previsão 2 |
 | 1140 | str 36 | `notification1Sender` | WhatsApp | `monitorNotifications`, `SendNotifications` | Remetente |
 | 1141 | str 96 | `notification_1_content` | WhatsApp | `monitorNotifications`, `SendNotifications` | Texto da mensagem |
@@ -150,6 +150,27 @@ lembretes 2 e 3 (1092-1095), mídia (1100-1102, 2003), clima de 5 dias (1111-111
 
 Eles **não fazem parte** do layout gravado de fábrica e não devem ser enviados. Se o layout
 mudar no futuro (fase experimental de GIFs personalizados), esta lista pode ser revista.
+
+## Textos e ícones do clima
+
+Os formatos vêm dos textos de exemplo do próprio layout (`São Paulo`, `25°/26°`, `Sáb 29`) e
+das strings do app oficial, que usa só `mintemp_c` e `maxtemp_c` da previsão.
+
+Os ícones (registradores 1110, 1115 e 1120) são uma textura de 8 imagens no layout:
+
+| Valor | Ícone |
+|---|---|
+| 0 | Sol |
+| 1 | Sol com nuvem |
+| 2 | Nuvem |
+| 3 | Chuva |
+| 4 | Lua |
+| 5 | Lua com nuvem |
+| 6 | Neve |
+| 7 | Vazio |
+
+O app oficial em C++ tinha 7 ícones próprios (`weather_icons/0.png` a `6.png`) e o MiniPanel
+usava outra tabela (abaixo), feita para outro layout.
 
 ## Mapeamento do clima no MiniPanel
 
