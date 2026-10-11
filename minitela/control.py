@@ -22,6 +22,10 @@ TIMEOUT = 5.0
 
 def socket_path() -> Path:
     base = os.environ.get("XDG_RUNTIME_DIR") or f"/tmp/{APP_DIR}-{os.getuid()}"
+    if flatpak_id := os.environ.get("FLATPAK_ID"):
+        # Each sandbox has its own runtime dir; only app/<id> is shared by all of the app's
+        # instances (e.g. 'flatpak run --command=minitela ... next-page' from a key binding).
+        return Path(base) / "app" / flatpak_id / "control.sock"
     return Path(base) / APP_DIR / "control.sock"
 
 

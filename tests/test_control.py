@@ -99,7 +99,15 @@ def test_stop_twice(server):
 
 
 def test_socket_path(monkeypatch, tmp_path):
+    monkeypatch.delenv("FLATPAK_ID", raising=False)
     monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path))
     assert control.socket_path() == tmp_path / "minitela" / "control.sock"
     monkeypatch.delenv("XDG_RUNTIME_DIR")
     assert str(control.socket_path()).startswith("/tmp/minitela-")
+
+
+def test_socket_path_in_flatpak(monkeypatch, tmp_path):
+    """Shared by every instance of the app, and reachable from the host."""
+    monkeypatch.setenv("FLATPAK_ID", "dev.pragmatico.Minitela")
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path))
+    assert control.socket_path() == tmp_path / "app" / "dev.pragmatico.Minitela" / "control.sock"
