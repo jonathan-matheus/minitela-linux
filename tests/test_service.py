@@ -514,3 +514,45 @@ def test_failing_listener_is_logged(clock, screen, tmp_path, caplog):
     service.add_listener(broken)
     service.run()
     assert "state listener failed" in caplog.text
+
+
+# --- Upload --------------------------------------------------------------------------------
+
+
+def test_upload_texture(clock, screen, tmp_path):
+    from minitela.upload import TEXTURE_ADDRESS
+
+    service = connected_service(clock, screen, tmp_path)
+    progress = []
+    service.upload_texture(b"texture" * 500, lambda sent, total: progress.append(sent))
+    assert screen.textures[TEXTURE_ADDRESS] == b"texture" * 500
+    assert progress[-1] == 3500
+    assert not service.connection.is_open  # the screen restarts after an upload
+    assert service.state.detail == "restarting to load the new GIF"
+    screen.numbers.clear()
+    service._step()  # reconnects, sends everything again, then shows the GIF page
+    assert screen.numbers[7] == 80
+    assert screen.numbers[2] == 5
+    service._step()
+    assert service.scheduler.sent[tags.PAGE] == 5  # shown once, not on every step
+
+
+def test_upload_needs_the_screen(clock, tmp_path):
+    run = Run(clock, steps=1)
+    service = make_service(
+        clock,
+        lambda: (_ for _ in ()).throw(DeviceNotFoundError("no")),
+        tmp_path / "s.json",
+        [],
+        run,
+    )
+    with pytest.raises(TransportError):
+        service.upload_texture(b"x", lambda sent, total: None)
+
+
+def test_step_skips_a_connection_closed_meanwhile(clock, screen, tmp_path, monkeypatch):
+    service = connected_service(clock, screen, tmp_path)
+    transport = service.connection.get_transport()
+    monkeypatch.setattr(service.connection, "get_transport", lambda: transport)
+    service.connection.close()  # e.g. by an upload in another thread
+    assert service._step() == Service.RETRY_DELAY

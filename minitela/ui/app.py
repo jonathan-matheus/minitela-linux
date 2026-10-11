@@ -67,7 +67,8 @@ class MinitelaApp(Adw.Application):
     def do_activate(self) -> None:
         window = self.props.active_window
         if window is None:
-            window = MainWindow(self, SettingsStore(), self.command)
+            upload = self.runner.service.upload_texture if self.runner is not None else None
+            window = MainWindow(self, SettingsStore(), self.command, upload)
             window.show_state(self.state)
         window.present()
 

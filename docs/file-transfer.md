@@ -66,11 +66,17 @@ Gravação da textura de fábrica 5 (1.622.024 bytes) em `tests/fixtures/device-
      cada bloco é confirmado com código 0 em ~2 ms
      código 0xFFFFFFFF → aguardar a resposta final; outro código → reenviar o bloco
 4. DOWNLOAD_COMPLETE → código 0
-5. SET_REGISTER página = 5, para mostrar o GIF
+5. reabrir a porta (~2 s), HANDSHAKE e SET_REGISTER página = 5, para mostrar o GIF
 ```
 
-O envio inteiro levou **7,3 s**. A porta serial continuou aberta, sem reiniciar o USB, mas o
-layout foi recarregado: a página voltou para 1, por isso o passo 5 é necessário.
+O envio inteiro levou **7,3 s**. Logo depois de confirmar o `DOWNLOAD_COMPLETE`, o
+dispositivo **se desconecta da USB e volta cerca de 2 s depois** (o kernel registra um
+`USB disconnect` e uma nova enumeração) para carregar o layout novo, já na página 1. Por isso
+é preciso reabrir a porta e refazer o handshake antes do passo 5. A regra udev volta a dar
+acesso ao usuário automaticamente.
+
+> A primeira versão deste documento dizia que a porta continuava aberta: o teste fechava a
+> porta logo após o envio e não chegou a ver a desconexão.
 
 O MiniPanel consulta o estado antes (passo extra entre 1 e 2) para pular texturas já gravadas
 e retomar envios; como este firmware não informa isso, o passo é omitido.

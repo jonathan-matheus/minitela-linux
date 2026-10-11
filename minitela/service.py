@@ -30,6 +30,7 @@ from minitela.transport.connection import (
     DeviceNotFoundError,
     DevicePermissionError,
 )
+from minitela.upload import TextureUpload
 
 log = logging.getLogger(__name__)
 
@@ -177,6 +178,7 @@ class Service:
         self._listeners: list[Callable[[State], None]] = []
         self._lock = threading.RLock()  # serial I/O from the loop and from system events
         self._blank_reasons: set[str] = set()
+        self._after_connect: Values = {}  # sent once after the next (re)connection
         self.running = False
 
     def run(self) -> None:
@@ -208,7 +210,12 @@ class Service:
         self._set_state(Status.CONNECTED, getattr(transport, "port", ""))
         try:
             with self._lock:
+                if not self.connection.is_open:
+                    return self.RETRY_DELAY  # closed meanwhile, e.g. after an upload
                 sent = self.scheduler.tick(self._device, self._overrides())
+                if self._after_connect:
+                    sent |= self.scheduler.send(self._device, self._after_connect)
+                    self._after_connect = {}
         except (TransportError, ResponseTimeout, ProtocolError) as error:
             self._set_state(Status.UNAVAILABLE, f"lost the mini screen: {error}")
             self.connection.close()
@@ -267,6 +274,23 @@ class Service:
             self.scheduler.send(self._device, {tags.PAGE: page})
             log.info("page = %d (%s)", page, name)
             return f"ok {page}"
+
+    def upload_texture(self, data: bytes, progress: Callable[[int, int], None]) -> None:
+        """Write a texture (.acf) to the screen, holding the port for the whole upload.
+
+        Called from a worker thread. To load the new layout the screen drops off USB right
+        after the upload and comes back about 2 s later; the service then reconnects as
+        usual, sends everything again and shows the GIF page. Raises TransportError if not
+        connected.
+        """
+        with self._lock:
+            if self._device is None or not self.connection.is_open:
+                raise TransportError("mini screen not connected")
+            log.info("uploading a texture of %d bytes", len(data))
+            TextureUpload(self._device.transport, data, progress=progress).run()
+            self.connection.close()
+            self._after_connect = {tags.PAGE: tags.Page.GIF1}
+            self._set_state(Status.UNAVAILABLE, "restarting to load the new GIF")
 
     def _next_page(self) -> int:
         pages = self.settings.pages

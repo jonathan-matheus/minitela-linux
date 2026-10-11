@@ -10,6 +10,7 @@ from gi.repository import Adw, Gdk, Gtk  # noqa: E402
 
 from minitela.service import State, Status  # noqa: E402
 from minitela.sources.reminder import ReminderStore  # noqa: E402
+from minitela.ui.gifs import GifsPage, Upload  # noqa: E402
 from minitela.ui.reminder import ReminderPage  # noqa: E402
 from minitela.ui.screens import ScreensPage  # noqa: E402
 from minitela.ui.setup import host_setup_command  # noqa: E402
@@ -23,6 +24,7 @@ class MainWindow(Adw.ApplicationWindow):
         application: Adw.Application,
         store: SettingsStore,
         command: Callable[[str], str],
+        upload: Upload | None = None,
     ):
         super().__init__(application=application, title="Minitela")
         self.set_default_size(460, 720)
@@ -32,10 +34,12 @@ class MainWindow(Adw.ApplicationWindow):
         self.screens = ScreensPage(store, self.show_page, self.preview_brightness)
         self.weather = WeatherPage(store)
         self.reminder = ReminderPage(ReminderStore(), self.show_page)
+        self.gifs = GifsPage(upload, self.notify)
         for name, page in (
             ("screen", self.screens),
             ("weather", self.weather),
             ("reminder", self.reminder),
+            ("gifs", self.gifs),
         ):
             self.stack.add_titled_with_icon(page, name, page.get_title(), page.get_icon_name())
         self.header = Adw.HeaderBar(
@@ -57,7 +61,10 @@ class MainWindow(Adw.ApplicationWindow):
         """Ask the service to show `page` now."""
         reply = self._command(f"page {page}")
         if not reply.startswith("ok"):
-            self.toasts.add_toast(Adw.Toast(title=f"Could not show the page: {reply}"))
+            self.notify(f"Could not show the page: {reply}")
+
+    def notify(self, message: str) -> None:
+        self.toasts.add_toast(Adw.Toast(title=message))
 
     def show_state(self, state: State | None) -> None:
         """Explain on a banner why the screen is not being updated; None: another process

@@ -18,6 +18,9 @@ class FakeService:
     def add_listener(self, callback):
         self.listeners.append(callback)
 
+    def upload_texture(self, data, progress):
+        progress(len(data), len(data))
+
 
 class FakeRunner:
     def __init__(self, refuse=False):
