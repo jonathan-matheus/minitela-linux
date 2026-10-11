@@ -14,9 +14,11 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
 from minitela import control  # noqa: E402
+from minitela.dbus import BusError  # noqa: E402
 from minitela.runner import Runner  # noqa: E402
 from minitela.service import State  # noqa: E402
 from minitela.ui.store import SettingsStore  # noqa: E402
+from minitela.ui.tray import TrayIcon  # noqa: E402
 from minitela.ui.window import MainWindow  # noqa: E402
 
 log = logging.getLogger(__name__)
@@ -43,6 +45,7 @@ class MinitelaApp(Adw.Application):
         self._make_runner = make_runner
         self._start_hidden = background
         self.runner: Runner | None = None
+        self.tray: TrayIcon | None = None
         self._thread: threading.Thread | None = None
         self.state: State | None = None  # None: another process drives the screen
 
@@ -70,6 +73,29 @@ class MinitelaApp(Adw.Application):
         runner.service.add_listener(lambda state: GLib.idle_add(self._show_state, state))
         self._thread = threading.Thread(target=runner.run, name="minitela-service", daemon=True)
         self._thread.start()
+        self._show_tray_icon()
+
+    def _show_tray_icon(self) -> None:
+        """A tray icon while the app keeps the screen updated in the background, if the
+        desktop has a tray."""
+        tray = TrayIcon(
+            self.get_dbus_connection(),
+            "Minitela",
+            APP_ID,
+            self.activate,
+            [
+                ("Open Minitela", self.activate),
+                ("Next page", lambda: self.command("next-page")),
+                ("Quit", self.quit),
+            ],
+            str(SOURCE_ICONS) if SOURCE_ICONS.is_dir() else "",
+        )
+        try:
+            tray.register()
+        except BusError as error:
+            log.info("no tray icon: %s", error)
+            return
+        self.tray = tray
 
     def do_activate(self) -> None:
         if self._start_hidden:
@@ -103,6 +129,9 @@ class MinitelaApp(Adw.Application):
         return GLib.SOURCE_REMOVE
 
     def do_shutdown(self) -> None:
+        if self.tray is not None:
+            self.tray.unregister()
+            self.tray = None
         if self.runner is not None:
             self.runner.stop()
             self._thread.join()

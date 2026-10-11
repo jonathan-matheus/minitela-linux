@@ -45,6 +45,31 @@ def commands():
     return Commands()
 
 
+class FakeTray:
+    instances: list = []  # noqa: RUF012 - reset for each test by the fixture below
+
+    def __init__(self, connection, title, icon_name, activate, menu, icon_theme_path=""):
+        self.activate, self.menu = activate, menu
+        self.registered = False
+        FakeTray.instances.append(self)
+
+    def register(self):
+        self.registered = True
+
+    def unregister(self):
+        self.registered = False
+
+
+@pytest.fixture(autouse=True)
+def fake_tray(monkeypatch):
+    """Never put test icons in the developer's real tray."""
+    from minitela.ui import app
+
+    FakeTray.instances = []
+    monkeypatch.setattr(app, "TrayIcon", FakeTray)
+    return FakeTray.instances
+
+
 @pytest.fixture(autouse=True)
 def no_windows_on_screen(monkeypatch):
     """Build windows without showing them on the developer's screen."""

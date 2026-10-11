@@ -219,3 +219,45 @@ def test_commands_go_to_the_other_process():
     server.stop()
     assert app.command("next-page") == "error: no Minitela service is running"
     app.do_shutdown()
+
+
+def test_tray_icon_while_the_service_runs(fake_tray, monkeypatch):
+    runner = FakeRunner()
+    actions = []
+    monkeypatch.setattr(MinitelaApp, "activate", lambda self: actions.append("activate"))
+    monkeypatch.setattr(MinitelaApp, "quit", lambda self: actions.append("quit"))
+    monkeypatch.setattr(MinitelaApp, "command", lambda self, command: actions.append(command))
+    app = make_app(runner)
+    app.register(None)
+    (tray,) = fake_tray
+    assert app.tray is tray and tray.registered
+    tray.activate()
+    for _label, action in tray.menu:
+        action()
+    assert [label for label, _ in tray.menu] == ["Open Minitela", "Next page", "Quit"]
+    assert actions == ["activate", "activate", "next-page", "quit"]
+    app.do_shutdown()
+    assert not tray.registered
+    assert app.tray is None
+
+
+def test_no_tray_icon_without_own_service(fake_tray):
+    app = make_app(FakeRunner(refuse=True))
+    app.register(None)
+    assert fake_tray == []
+    app.do_shutdown()
+
+
+def test_no_tray_on_the_desktop(fake_tray, monkeypatch, caplog):
+    from minitela.dbus import BusError
+
+    def no_watcher(self):
+        raise BusError("no StatusNotifierWatcher")
+
+    app = make_app(FakeRunner())
+    monkeypatch.setattr(app_module.TrayIcon, "register", no_watcher)
+    caplog.set_level("INFO")
+    app.register(None)
+    assert app.tray is None
+    assert "no tray icon" in caplog.text
+    app.do_shutdown()
