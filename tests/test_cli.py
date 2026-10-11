@@ -366,3 +366,75 @@ def test_reminder_send(data_home, plugged, screen):
     assert cli.main(["reminder", "Beber água", "--send"]) == 0
     assert screen.texts[1090] == "Beber água".encode()
     assert screen.numbers[2] == 2
+
+
+class FakeMonitor:
+    def __init__(self, on_notification, fail=False):
+        self.on_notification = on_notification
+        self.fail = fail
+        self.running = False
+
+    def start(self):
+        if self.fail:
+            raise cli.BusError("BecomeMonitor not allowed")
+        self.running = True
+
+    def stop(self):
+        self.running = False
+
+
+def run_notifications(monkeypatch, argv, notifications, fail=False):
+    """Run 'minitela notifications', delivering one notification per poll, then Ctrl+C."""
+    from minitela.sources.notifications import Notification
+
+    monitors = []
+
+    def make_monitor(on_notification):
+        monitors.append(FakeMonitor(on_notification, fail))
+        return monitors[-1]
+
+    pending = list(notifications)
+
+    def sleep(seconds):
+        if not pending:
+            raise KeyboardInterrupt
+        monitors[0].on_notification(Notification(*pending.pop(0)))
+
+    monkeypatch.setattr(cli, "_notification_monitor", make_monitor)
+    monkeypatch.setattr(cli.time, "sleep", sleep)
+    code = cli.main(argv)
+    return code, monitors
+
+
+def test_notifications(monkeypatch, capsys):
+    code, monitors = run_notifications(
+        monkeypatch,
+        ["notifications"],
+        [("WhatsApp", "Maria", "Oi"), ("Thunderbird", "Chefe", "x"), ("WhatsApp", "João", "Ok")],
+    )
+    assert code == 0
+    assert capsys.readouterr().out.splitlines()[1:] == ["(none)", "Maria: 'Oi'", "João: 'Ok'"]
+    assert not monitors[0].running
+
+
+def test_notifications_send(monkeypatch, plugged, screen):
+    code, _ = run_notifications(
+        monkeypatch, ["notifications", "--send"], [("WhatsApp", "Maria", "Oi")]
+    )
+    assert code == 0
+    assert screen.texts[1140] == b"Maria"
+    assert screen.numbers[2005] == 1
+    assert screen.numbers[2] == 1
+
+
+def test_notifications_not_allowed(monkeypatch, capsys):
+    code, _ = run_notifications(monkeypatch, ["notifications"], [], fail=True)
+    assert code == 1
+    assert "cannot watch notifications" in capsys.readouterr().err
+
+
+def test_default_notification_monitor():
+    pytest.importorskip("gi")
+    from minitela.sources.notifications_gio import NotificationMonitor
+
+    assert isinstance(cli._notification_monitor(lambda n: None), NotificationMonitor)

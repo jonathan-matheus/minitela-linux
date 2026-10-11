@@ -10,9 +10,11 @@ from pathlib import Path
 
 from minitela import __version__
 from minitela.assets import InvalidPackageError, import_deb, library_dir, load_library
+from minitela.dbus import BusError
 from minitela.device import PAGE_COUNT, Device
 from minitela.protocol import tags
 from minitela.protocol.commands import ProtocolError
+from minitela.sources.notifications import NotificationSource
 from minitela.sources.reminder import ReminderSource, ReminderStore
 from minitela.sources.weather import WeatherSource, search_cities
 from minitela.transport.base import ResponseTimeout, TransportError
@@ -217,6 +219,45 @@ def _reminder(args: argparse.Namespace) -> int:
     return 0
 
 
+def _notification_monitor(on_notification):
+    from minitela.sources.notifications_gio import NotificationMonitor
+
+    return NotificationMonitor(on_notification)
+
+
+def _notifications(args: argparse.Namespace) -> int:
+    """Follow WhatsApp notifications until Ctrl+C (a preview of what the service will do)."""
+    source = NotificationSource()
+    monitor = _notification_monitor(source.push)
+    try:
+        monitor.start()
+    except BusError as error:
+        return _fail(f"cannot watch notifications: {error}")
+    device = _connected(args) if args.send else None
+    print("Waiting for WhatsApp notifications (Ctrl+C to stop)...", flush=True)
+    shown = None
+    try:
+        while True:
+            values = source.read()
+            if values != shown:
+                shown = values
+                sender = values[tags.NOTIFICATION_SENDER]
+                line = f"{sender}: {values[tags.NOTIFICATION_TEXT]!r}" if sender else "(none)"
+                print(line, flush=True)
+                if device is not None:
+                    for register, value in values.items():
+                        device.set_tag(register, value)
+                    if sender:
+                        device.show_page(tags.Page.WHATSAPP)
+            time.sleep(source.interval)
+    except KeyboardInterrupt:
+        return 0
+    finally:
+        monitor.stop()
+        if device is not None:
+            device.transport.close()
+
+
 def _page_number(value: str) -> int:
     """A page number or name (whatsapp, reminder, system_info, weather, gif1...)."""
     names = ", ".join(page.name.lower() for page in tags.Page)
@@ -287,6 +328,13 @@ def build_parser() -> argparse.ArgumentParser:
     reminder.add_argument("--clear", action="store_true", help="remove the reminder")
     reminder.add_argument("--send", action="store_true", help="also show it on the mini screen")
     reminder.set_defaults(handler=_reminder)
+    notifications = subcommands.add_parser(
+        "notifications", help="follow WhatsApp notifications until Ctrl+C"
+    )
+    notifications.add_argument(
+        "--send", action="store_true", help="also show them on the mini screen"
+    )
+    notifications.set_defaults(handler=_notifications)
     return parser
 
 
