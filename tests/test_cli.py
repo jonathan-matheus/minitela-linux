@@ -160,3 +160,10 @@ def test_unexpected_reply(monkeypatch, capsys):
     monkeypatch.setattr(cli, "open_device", lambda path=None: FakeTransport(responder))
     assert cli.main(["brightness", "50"]) == 1
     assert "unexpected reply" in capsys.readouterr().err
+
+
+def test_sync_clock(plugged, screen, capsys):
+    assert cli.main(["sync-clock"]) == 0
+    shown = screen.texts[2006].decode()
+    assert f"Clock set to {shown}" in capsys.readouterr().out
+    assert screen.numbers[4] >> 16 >= 0x2026

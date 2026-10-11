@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Iterable, Mapping
+from datetime import datetime
 
 from minitela.protocol import commands, registers, tags
 from minitela.protocol.commands import Command, HandshakeResponse, ProtocolError
@@ -62,6 +63,20 @@ class Device:
         if not 1 <= page <= PAGE_COUNT:
             raise ValueError(f"page must be 1-{PAGE_COUNT}, got {page}")
         self.write_numbers({tags.PAGE.id: page})
+
+    def write_text(self, register: Register, text: str) -> None:
+        """Set a text register, cut to its maximum length."""
+        self._check_ack(registers.write_string(register.id, text, register.max_length))
+
+    def sync_clock(self, moment: datetime) -> None:
+        """Show `moment` as the date and time, and set the device's internal clock to it."""
+        self.write_text(tags.DATE_HOUR, tags.date_hour(moment))
+        self.write_numbers(
+            {
+                tags.CLOCK_DATE.id: tags.clock_date(moment),
+                tags.CLOCK_TIME.id: tags.clock_time(moment),
+            }
+        )
 
     def _check_ack(self, frame: Frame) -> None:
         ack = registers.parse_write_ack(self._register_request(frame))

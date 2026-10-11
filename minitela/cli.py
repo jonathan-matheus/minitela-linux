@@ -4,6 +4,7 @@ import argparse
 import logging
 import sys
 from collections.abc import Callable
+from datetime import datetime
 
 from minitela import __version__
 from minitela.device import PAGE_COUNT, Device
@@ -66,6 +67,15 @@ def _page(args: argparse.Namespace) -> int:
     return 0
 
 
+def _sync_clock(args: argparse.Namespace) -> int:
+    device = _connected(args)
+    with device.transport:
+        now = datetime.now()
+        device.sync_clock(now)
+    print(f"Clock set to {tags.date_hour(now)}")
+    return 0
+
+
 def _page_number(value: str) -> int:
     """A page number or name (whatsapp, reminder, system_info, weather, gif1...)."""
     names = ", ".join(page.name.lower() for page in tags.Page)
@@ -99,6 +109,8 @@ def build_parser() -> argparse.ArgumentParser:
     page = subcommands.add_parser("page", help="show a page (number or name)")
     page.add_argument("page", type=_page_number)
     page.set_defaults(handler=_page)
+    clock = subcommands.add_parser("sync-clock", help="set the date and time to now")
+    clock.set_defaults(handler=_sync_clock)
     return parser
 
 

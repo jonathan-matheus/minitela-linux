@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import pytest
 
 from minitela.device import Device
@@ -103,3 +105,19 @@ def test_write_of_another_register_acknowledged():
     device = Device(FakeTransport(lambda frame: [ack_for(b"\x00\x02")]), timeout=0.05)
     with pytest.raises(ProtocolError):
         device.set_brightness(50)
+
+
+def test_write_text(device, screen):
+    device.write_text(tags.BATTERY_PERCENT, "80%")
+    assert screen.texts == {1082: b"80%"}
+
+
+def test_write_text_is_cut_to_the_register_size(device, screen):
+    device.write_text(tags.BATTERY_PERCENT, "x" * 40)
+    assert screen.texts == {1082: b"x" * 32}
+
+
+def test_sync_clock(device, screen):
+    device.sync_clock(datetime(2026, 10, 11, 14, 5, 9))
+    assert screen.texts == {2006: b"11/10 14:05"}
+    assert screen.numbers == {4: 0x20261011, 5: 0x140509}
