@@ -9,6 +9,8 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gtk  # noqa: E402
 
 from minitela.service import State, Status  # noqa: E402
+from minitela.sources.reminder import ReminderStore  # noqa: E402
+from minitela.ui.reminder import ReminderPage  # noqa: E402
 from minitela.ui.screens import ScreensPage  # noqa: E402
 from minitela.ui.setup import host_setup_command  # noqa: E402
 from minitela.ui.store import SettingsStore  # noqa: E402
@@ -29,7 +31,12 @@ class MainWindow(Adw.ApplicationWindow):
         self.stack = Adw.ViewStack()
         self.screens = ScreensPage(store, self.show_page, self.preview_brightness)
         self.weather = WeatherPage(store)
-        for name, page in (("screen", self.screens), ("weather", self.weather)):
+        self.reminder = ReminderPage(ReminderStore(), self.show_page)
+        for name, page in (
+            ("screen", self.screens),
+            ("weather", self.weather),
+            ("reminder", self.reminder),
+        ):
             self.stack.add_titled_with_icon(page, name, page.get_title(), page.get_icon_name())
         self.header = Adw.HeaderBar(
             title_widget=Adw.ViewSwitcher(stack=self.stack, policy=Adw.ViewSwitcherPolicy.WIDE)
