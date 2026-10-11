@@ -102,6 +102,11 @@ class Transport(ABC):
             log.warning("serial link failed: %s", error)
             self._error = error
 
+    def _closed(self) -> None:
+        """Mark the transport unusable after an intentional close, without logging a failure."""
+        if self._error is None:
+            self._error = TransportError("closed")
+
     def _check(self) -> None:
         if self._error is not None:
             raise TransportError(str(self._error)) from self._error

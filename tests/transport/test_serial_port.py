@@ -75,3 +75,8 @@ def test_write_failure_is_reported(transport, monkeypatch):
     with pytest.raises(TransportError, match="disconnected"):
         transport.send(handshake())
     assert not transport.is_open
+
+
+def test_close_is_not_logged_as_failure(transport, caplog):
+    transport.close()
+    assert "failed" not in caplog.text

@@ -27,7 +27,7 @@ class FakeTransport(Transport):
         self._failed(TransportError("device disconnected"))
 
     def close(self) -> None:
-        self._failed(TransportError("closed"))
+        self._closed()
 
     def _write(self, data: bytes) -> None:
         for frame in self._sent_decoder.feed(data):

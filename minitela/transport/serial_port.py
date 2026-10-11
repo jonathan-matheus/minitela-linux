@@ -27,7 +27,7 @@ class SerialTransport(Transport):
         self._closing.set()
         self._serial.close()
         self._reader.join(timeout=1)
-        self._failed(TransportError("closed"))
+        self._closed()
 
     def _write(self, data: bytes) -> None:
         try:
