@@ -49,6 +49,8 @@ modules:
       - install -Dm644 data/dev.pragmatico.Minitela.desktop -t ${FLATPAK_DEST}/share/applications
       - install -Dm644 data/icons/hicolor/scalable/apps/dev.pragmatico.Minitela.svg
         -t ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps
+      # Piped out of the sandbox by the setup dialog's command (minitela/ui/setup.py).
+      - install -Dm755 host/host-setup.sh -t ${FLATPAK_DEST}/share/minitela
     sources:
       - type: dir
         path: ../..
