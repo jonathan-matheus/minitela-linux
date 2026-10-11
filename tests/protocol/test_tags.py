@@ -38,6 +38,11 @@ def test_pages():
     assert tags.Page.GIF1 == 5
 
 
+@pytest.mark.parametrize(("number", "name"), [(1, "whatsapp"), (5, "gif1"), (8, "unknown")])
+def test_page_name(number, name):
+    assert tags.page_name(number) == name
+
+
 def test_battery_text():
     assert tags.battery_text(100) == "100%"
 

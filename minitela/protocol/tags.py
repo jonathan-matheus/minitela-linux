@@ -114,6 +114,14 @@ class Page(IntEnum):
     GIF3 = 7
 
 
+def page_name(number: int) -> str:
+    """Lowercase name of a layout page, or "unknown"."""
+    try:
+        return Page(number).name.lower()
+    except ValueError:
+        return "unknown"
+
+
 DISCONNECTED = "Desconectado"
 _NAME_LIMIT = 9
 

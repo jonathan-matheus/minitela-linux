@@ -34,13 +34,12 @@ def _probe(args: argparse.Namespace) -> int:
         firmware = device.read_text(tags.SOFTWARE_VERSION)
         state = device.read_numbers([tags.PAGE.id, tags.BRIGHTNESS.id])
         page = state[tags.PAGE.id]
-        page_name = tags.Page(page).name.lower() if page in tags.Page else "unknown"
         print(f"Mini screen at {path}")
         if found is not None:
             print(f"  USB device:    {found.vendor_id}:{found.product_id} {found.product}")
         print(f"  Firmware:      {firmware}")
         print(f"  Max packet:    {max_packet} bytes")
-        print(f"  Current page:  {page} ({page_name})")
+        print(f"  Current page:  {page} ({tags.page_name(page)})")
         print(f"  Brightness:    {state[tags.BRIGHTNESS.id]}")
     return 0
 
