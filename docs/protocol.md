@@ -7,9 +7,8 @@ editor MiniPanel 0.1.6 que o acompanha.
 O controlador da tela é um **GC9002**, programado com a IDE AHMI. O protocolo é o protocolo
 genérico de comunicação dessa plataforma.
 
-> **Status**: tudo o que está aqui foi lido no código dos apps oficiais. Os pontos marcados
-> com ❓ ainda precisam ser confirmados com capturas de tráfego do dispositivo real
-> (`tests/fixtures/`).
+> **Status**: lido no código dos apps oficiais e conferido com capturas do tráfego real
+> (`tests/fixtures/`). Os pontos marcados com ❓ ainda não foram confirmados no dispositivo.
 
 Veja também:
 
@@ -21,7 +20,7 @@ Veja também:
 | Item | Valor |
 |---|---|
 | Interface | USB CDC ACM, aparece como `/dev/ttyACM*` |
-| VID:PID | `0324:0324` ❓ (citado por usuários; confirmar com `lsusb`) |
+| VID:PID | `0324:0324`, produto `sxw-admin_CDC_DEMO` |
 | Velocidade | 115200 baud, 8N1 |
 
 Os bytes podem chegar fragmentados em várias leituras, ou vários quadros podem chegar na mesma
@@ -150,8 +149,12 @@ cabeçalho = 0xD0
 id (u16)  tamanho (u16)  bytes
 ```
 
-O texto é codificado em **UTF-8** (é o `encoding` do projeto AHMI). Cada registrador tem um
-tamanho máximo (ver [registers.md](registers.md)). ❓ Comportamento ao exceder o limite.
+O texto é codificado em **UTF-8** (é o `encoding` do projeto AHMI) e pode conter quebras de
+linha (`\n`). Cada registrador tem um tamanho máximo (ver [registers.md](registers.md)).
+❓ Comportamento ao exceder o limite.
+
+O app oficial nunca envia string vazia: para limpar um registrador ele envia um espaço
+(`tamanho = 1`, byte `0x20`).
 
 ### Ler registradores numéricos
 
@@ -183,8 +186,10 @@ A resposta a qualquer `SET_REGISTER` traz o valor atual dos registradores envolv
 - **MiniPanel**: espera a resposta do tipo esperado. Se ela não chega, reenvia o mesmo
   comando a cada 5 s. Só considera o tipo da resposta, não confere qual registrador foi
   respondido.
-- **App oficial (C++)**: envia os quadros e não espera resposta. Quando a porta falha,
-  fecha e reabre.
+- **App oficial (C++)**: envia os quadros e não espera resposta. Nas capturas ele nunca
+  chamou `read()` na porta. Envia um quadro a cada ~500 ms durante a atualização completa e
+  um quadro por mudança do slider de brilho, sem limitar a taxa. Quando a porta falha, fecha
+  e reabre.
 - O MiniPanel reenvia todos os registradores a cada 5 s, mesmo os que não mudaram.
 
 Proposta para esta implementação: esperar a resposta com timeout curto (≈1 s), poucas

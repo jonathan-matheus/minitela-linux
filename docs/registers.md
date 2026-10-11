@@ -17,7 +17,8 @@ oficial (`resources/ACF/file.zip`). Os dados do projeto são:
 | Versão da IDE | 1.10.19 (2025-01-09) |
 
 A coluna "Escrito por" indica a função do app oficial em C++ que escreve o registrador.
-Os pontos marcados com ❓ ainda precisam ser confirmados com capturas do dispositivo real.
+Os valores de exemplo vêm das capturas em `tests/fixtures/`. Os pontos marcados com ❓ ainda
+não foram observados no dispositivo.
 
 ## Páginas
 
@@ -35,6 +36,16 @@ O registrador 2 seleciona a página exibida.
 | 8-10 | `New-page` | Não usadas |
 
 O app oficial mostra a página 1 ao iniciar e a página 5 depois de enviar uma textura nova.
+As páginas 1 a 5 foram confirmadas nas capturas (`pages.hex`).
+
+## Sequência de inicialização do app oficial
+
+Capturada em `startup.hex`, com ~500 ms entre os quadros:
+
+1. Brilho (7) e página 1 (2)
+2. Data e hora (2006)
+3. Bateria (1150 e 1082), Bluetooth (1085), Wi-Fi (1083)
+4. Fundos de mensagem (2025, 2026) e notificações limpas (1140 a 1143)
 
 ## Registradores do sistema
 
@@ -92,12 +103,12 @@ registradores e envia a data como texto no registrador 2006.
 
 | ID | Tipo | Nome | Página | Escrito por | Conteúdo |
 |---|---|---|---|---|---|
-| 1082 | str 32 | `Battery_Percent` | SystemInfo | `CheckSystem` | Porcentagem da bateria, como texto ❓ formato (`"80%"`?) |
-| 1083 | str 32 | `Wifi_SSID` | SystemInfo | `CheckSystem` | Nome da rede Wi-Fi |
-| 1085 | str 32 | `BT_Name` | SystemInfo | `CheckSystem` | Dispositivo Bluetooth conectado |
-| 1150 | num | `Battery_Type` | SystemInfo | `CheckSystem` | Ícone da bateria ❓ 0-3 (o app tem os ícones `bat0` a `bat3`) |
-| 1090 | str 100 | `Reminder1` | Reminder | `GetTaskFromFile`, `on_button_task_pressed` | Texto do lembrete |
-| 2006 | str 32 | `dateHour` | várias | `UpdateDateInfo` | Data e hora ❓ formato |
+| 1082 | str 32 | `Battery_Percent` | SystemInfo | `CheckSystem` | Porcentagem da bateria com `%`: `"100%"` |
+| 1083 | str 32 | `Wifi_SSID` | SystemInfo | `CheckSystem` | Nome da rede Wi-Fi, cortado em 9 caracteres + `...` quando é maior; `"Desconectado"` sem rede |
+| 1085 | str 32 | `BT_Name` | SystemInfo | `CheckSystem` | Dispositivo Bluetooth conectado; `"Desconectado"` sem dispositivo |
+| 1150 | num | `Battery_Type` | SystemInfo | `CheckSystem` | Ícone da bateria, 0 a 3 (ícones `bat0` a `bat3`); `3` com 100%. ❓ Faixas dos outros valores |
+| 1090 | str 100 | `Reminder1` | Reminder | `GetTaskFromFile`, `on_button_task_pressed` | Texto do lembrete, pode ter `\n`. O app limpa (`" "`) antes de gravar |
+| 2006 | str 32 | `dateHour` | várias | `UpdateDateInfo` | Data e hora `"DD/MM HH:MM"`, enviada uma vez por minuto: `"11/10 02:21"` |
 | 2027 | str 32 | `city` | Weather | `SendWeatherToHardware` | Nome da cidade |
 | 1110 | num | `Weather_1_Type` | Weather | `SendWeatherToHardware` | Ícone do clima de hoje ❓ valores |
 | 2030 | str 32 | `currentTemp` | Weather | `SendWeatherToHardware` | Temperatura atual ❓ formato |
@@ -110,11 +121,12 @@ registradores e envia a data como texto no registrador 2006.
 | 1140 | str 36 | `notification1Sender` | WhatsApp | `monitorNotifications`, `SendNotifications` | Remetente |
 | 1141 | str 96 | `notification_1_content` | WhatsApp | `monitorNotifications`, `SendNotifications` | Texto da mensagem |
 | 2005 | num | `whatsapp_logo` | WhatsApp | `monitorNotifications` | 0 ou 1: mostra o logo (há notificação) ❓ |
-| 2025 | num | `MessageBackground1` | WhatsApp | `monitorNotifications`, `SendNotifications` | Fundo da mensagem ❓ valores |
-| 2026 | num | `MessageBackground2` | WhatsApp | `SendNotifications` | Fundo da mensagem ❓ valores |
+| 2025 | num | `MessageBackground1` | WhatsApp | `monitorNotifications`, `SendNotifications` | Fundo da mensagem. `1` sem notificações. ❓ Outros valores |
+| 2026 | num | `MessageBackground2` | WhatsApp | `SendNotifications` | Fundo da mensagem. `1` sem notificações. ❓ Outros valores |
 
 O app oficial também escreve `1142` e `1143` (segunda notificação) em `SendNotifications`,
-mas esses IDs não existem no layout da Positivo. Os registradores com ID `0` no `data.json`
+mas esses IDs não existem no layout da Positivo. Sem notificações, ele limpa `1140` a `1143`
+com `" "`. Os registradores com ID `0` no `data.json`
 (`notification2Sender`, `notification_2_content`) estão desligados (`register: false`).
 
 ### Registradores internos do layout
