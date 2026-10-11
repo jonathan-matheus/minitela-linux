@@ -245,11 +245,19 @@ class Service:
                 log.warning("could not change the brightness: %s", error)
 
     def handle_command(self, command: str) -> str:
-        """Run a control command ("next-page" or "page N"); returns the reply."""
+        """Run a control command ("next-page", "page N", "brightness N"); returns the reply.
+
+        "brightness" previews a value without saving it (the app saves the settings once the
+        slider stops); it is ignored while the screen is blanked.
+        """
         name, _, argument = command.partition(" ")
         with self._lock:
             if self._device is None or not self.connection.is_open:
                 return "error: mini screen not connected"
+            if name == "brightness" and argument.isdigit() and int(argument) <= 100:
+                if not self.blanked:
+                    self.scheduler.send(self._device, {tags.BRIGHTNESS: int(argument)})
+                return "ok"
             if name == "next-page":
                 page = self._next_page()
             elif name == "page" and argument.isdigit() and 1 <= int(argument) <= PAGE_COUNT:

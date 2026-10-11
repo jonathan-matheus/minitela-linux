@@ -26,7 +26,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.store = store
         self._command = command
         self.stack = Adw.ViewStack()
-        self.screens = ScreensPage(store, self.show_page)
+        self.screens = ScreensPage(store, self.show_page, self.preview_brightness)
         self.stack.add_titled_with_icon(
             self.screens, "screen", self.screens.get_title(), self.screens.get_icon_name()
         )
@@ -41,6 +41,9 @@ class MainWindow(Adw.ApplicationWindow):
         toolbar.add_top_bar(self.banner)
         toolbar.set_content(self.toasts)
         self.set_content(toolbar)
+
+    def preview_brightness(self, percent: int) -> None:
+        self._command(f"brightness {percent}")
 
     def show_page(self, page: int) -> None:
         """Ask the service to show `page` now."""

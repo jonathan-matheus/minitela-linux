@@ -446,6 +446,16 @@ def test_page_command(clock, screen, tmp_path):
     assert service.handle_command("reboot").startswith("error")
 
 
+def test_brightness_preview(clock, screen, tmp_path):
+    service = connected_service(clock, screen, tmp_path)
+    assert service.handle_command("brightness 30") == "ok"
+    assert screen.numbers[7] == 30
+    service.set_blanked("lock", True)
+    assert service.handle_command("brightness 60") == "ok"
+    assert screen.numbers[7] == 0  # stays dark while locked
+    assert service.handle_command("brightness 101").startswith("error")
+
+
 def test_commands_need_the_screen(clock, tmp_path):
     run = Run(clock, steps=1)
     service = make_service(

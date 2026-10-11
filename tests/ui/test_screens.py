@@ -1,5 +1,5 @@
 import pytest
-from gi.repository import Gtk
+from gi.repository import GLib, Gtk
 from widgets import find_widget
 
 from minitela.settings import load_settings
@@ -12,8 +12,13 @@ def shown():
 
 
 @pytest.fixture
-def page(store, shown):
-    return ScreensPage(store, shown.append)
+def previews():
+    return []
+
+
+@pytest.fixture
+def page(store, shown, previews):
+    return ScreensPage(store, shown.append, previews.append)
 
 
 def test_initial_state(page):
@@ -49,9 +54,10 @@ def test_rotation(page):
     assert load_settings().rotation_seconds == 0
 
 
-def test_starts_from_saved_settings(store, shown):
-    store.update(pages=[3, 4], rotation_seconds=45)
-    page = ScreensPage(store, shown.append)
+def test_starts_from_saved_settings(store, shown, previews):
+    store.update(pages=[3, 4], rotation_seconds=45, brightness=35)
+    page = ScreensPage(store, shown.append, previews.append)
+    assert page.brightness.get_value() == 35
     assert [r.get_active() for r in page.page_rows.values()] == [False, False, True, True, False]
     assert page.rotate_row.get_active()
     assert page.interval_row.get_value() == 45
@@ -60,3 +66,21 @@ def test_starts_from_saved_settings(store, shown):
 def test_show_buttons(page, shown):
     find_widget(page.page_rows[4], Gtk.Button).emit("clicked")
     assert shown == [4]
+
+
+def run_main_loop(milliseconds):
+    loop = GLib.MainLoop()
+    GLib.timeout_add(milliseconds, loop.quit)
+    loop.run()
+
+
+def test_brightness_previews_at_once_and_saves_once(page, previews, monkeypatch):
+    from minitela.ui import screens
+
+    monkeypatch.setattr(screens, "SAVE_DELAY_MS", 10)
+    for value in (90, 70, 50):
+        page.brightness.set_value(value)
+    assert previews == [90, 70, 50]
+    assert load_settings().brightness == 100  # not saved while the slider moves
+    run_main_loop(50)
+    assert load_settings().brightness == 50

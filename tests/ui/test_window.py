@@ -67,3 +67,8 @@ def test_show_page_failure_is_reported(window, commands, monkeypatch):
     commands.reply = "error: mini screen not connected"
     window.show_page(4)
     assert toasts == ["Could not show the page: error: mini screen not connected"]
+
+
+def test_preview_brightness(window, commands):
+    window.preview_brightness(40)
+    assert commands.sent == ["brightness 40"]
