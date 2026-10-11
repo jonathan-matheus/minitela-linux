@@ -4,7 +4,9 @@ import logging
 import threading
 import time
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from typing import ClassVar
 
@@ -23,7 +25,11 @@ from minitela.sources.rotation import RotationSource
 from minitela.sources.weather import WeatherSource
 from minitela.sources.wifi import WifiSource
 from minitela.transport.base import ResponseTimeout, Transport, TransportError
-from minitela.transport.connection import Connection, DevicePermissionError
+from minitela.transport.connection import (
+    Connection,
+    DeviceNotFoundError,
+    DevicePermissionError,
+)
 
 log = logging.getLogger(__name__)
 
@@ -84,6 +90,8 @@ class Scheduler:
         return dict(self._sent)
 
     def seconds_until_due(self) -> float:
+        if not self.sources:
+            return float("inf")
         if len(self._due) < len(self.sources):
             return 0.0
         return max(0.0, min(self._due.values()) - self._clock())
@@ -125,6 +133,20 @@ def build_sources(
     return sources
 
 
+class Status(Enum):
+    STARTING = "starting"
+    CONNECTED = "connected"
+    NOT_FOUND = "not_found"
+    NO_PERMISSION = "no_permission"  # detail: the device path; the host setup is missing
+    UNAVAILABLE = "unavailable"  # detail: the error
+
+
+@dataclass(frozen=True)
+class State:
+    status: Status
+    detail: str = ""
+
+
 class Service:
     """Keeps the screen updated until stopped: connects, reconnects, follows the settings."""
 
@@ -151,7 +173,8 @@ class Service:
         self.scheduler = Scheduler([], clock)
         self.connection = Connection(open_transport, on_open=self._on_open)
         self._device: Device | None = None
-        self._waiting_logged = False
+        self.state = State(Status.STARTING)
+        self._listeners: list[Callable[[State], None]] = []
         self._lock = threading.RLock()  # serial I/O from the loop and from system events
         self._blank_reasons: set[str] = set()
         self.running = False
@@ -174,19 +197,20 @@ class Service:
         try:
             transport = self.connection.get_transport()
         except DevicePermissionError as error:
-            self._log_waiting(f"{error}: install the udev rule from host/")
+            self._set_state(Status.NO_PERMISSION, error.path)
+            return self.RETRY_DELAY
+        except DeviceNotFoundError:
+            self._set_state(Status.NOT_FOUND)
             return self.RETRY_DELAY
         except (TransportError, ResponseTimeout) as error:
-            self._log_waiting(f"mini screen not available ({error}), waiting")
+            self._set_state(Status.UNAVAILABLE, str(error))
             return self.RETRY_DELAY
-        if self._waiting_logged:
-            log.info("mini screen connected at %s", getattr(transport, "port", "?"))
-            self._waiting_logged = False
+        self._set_state(Status.CONNECTED, getattr(transport, "port", ""))
         try:
             with self._lock:
                 sent = self.scheduler.tick(self._device, self._overrides())
         except (TransportError, ResponseTimeout, ProtocolError) as error:
-            log.warning("lost the mini screen: %s", error)
+            self._set_state(Status.UNAVAILABLE, f"lost the mini screen: {error}")
             self.connection.close()
             return self.RETRY_DELAY
         for register, value in sent.items():
@@ -265,7 +289,26 @@ class Service:
         self.scheduler = Scheduler(self._make_sources(self.settings), self._clock)
         log.info("settings loaded: %s", ", ".join(s.name for s in self.scheduler.sources))
 
-    def _log_waiting(self, message: str) -> None:
-        if not self._waiting_logged:
-            log.warning(message)
-            self._waiting_logged = True
+    def add_listener(self, callback: Callable[[State], None]) -> None:
+        """Call `callback(state)` whenever the connection state changes (from the service's
+        thread)."""
+        self._listeners.append(callback)
+
+    def _set_state(self, status: Status, detail: str = "") -> None:
+        state = State(status, detail)
+        if state == self.state:
+            return
+        self.state = state
+        if status is Status.CONNECTED:
+            log.info("mini screen connected at %s", detail)
+        elif status is Status.NO_PERMISSION:
+            log.warning("no permission to open %s: install the udev rule from host/", detail)
+        elif status is Status.NOT_FOUND:
+            log.warning("mini screen not connected, waiting")
+        else:
+            log.warning("mini screen not available (%s), waiting", detail)
+        for callback in self._listeners:
+            try:
+                callback(state)
+            except Exception:
+                log.exception("state listener failed")

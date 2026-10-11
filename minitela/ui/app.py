@@ -14,6 +14,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
 from minitela.runner import Runner  # noqa: E402
+from minitela.service import State  # noqa: E402
 from minitela.ui.window import MainWindow  # noqa: E402
 
 log = logging.getLogger(__name__)
@@ -39,6 +40,7 @@ class MinitelaApp(Adw.Application):
         self._make_runner = make_runner
         self.runner: Runner | None = None
         self._thread: threading.Thread | None = None
+        self.state: State | None = None  # None: another process drives the screen
 
     def do_startup(self) -> None:
         Adw.Application.do_startup(self)
@@ -55,12 +57,24 @@ class MinitelaApp(Adw.Application):
             log.warning("not starting the service: %s", error)
             return
         self.runner = runner
+        self.state = runner.service.state
+        runner.service.add_listener(lambda state: GLib.idle_add(self._show_state, state))
         self._thread = threading.Thread(target=runner.run, name="minitela-service", daemon=True)
         self._thread.start()
 
     def do_activate(self) -> None:
-        window = self.props.active_window or MainWindow(self)
+        window = self.props.active_window
+        if window is None:
+            window = MainWindow(self)
+            window.show_state(self.state)
         window.present()
+
+    def _show_state(self, state: State) -> bool:
+        """Runs on the main thread (scheduled from the service's thread)."""
+        self.state = state
+        if self.props.active_window is not None:
+            self.props.active_window.show_state(state)
+        return GLib.SOURCE_REMOVE
 
     def _on_signal(self) -> bool:
         self.quit()

@@ -152,6 +152,12 @@ def test_reset_resends_everything(clock, device):
     assert source.reads == 2
 
 
+def test_no_sources(clock, device):
+    scheduler = Scheduler([], clock)
+    assert scheduler.tick(device) == {}
+    assert scheduler.seconds_until_due() == float("inf")
+
+
 def test_write_values(device, screen):
     device.write_values({tags.BATTERY_ICON: 1, tags.WIFI_NAME: "casa", tags.PAGE: 3})
     assert screen.numbers == {1150: 1, 2: 3}
@@ -232,7 +238,7 @@ def test_service_waits_for_the_screen(clock, screen, tmp_path, caplog):
     )
     service.run()
     assert run.sleeps[:2] == [Service.RETRY_DELAY, Service.RETRY_DELAY]
-    assert caplog.text.count("not available") == 1  # logged once while waiting
+    assert caplog.text.count("not connected, waiting") == 1  # logged once while waiting
     assert "mini screen connected" in caplog.text
     assert screen.numbers[1150] == 1
 
@@ -450,3 +456,51 @@ def test_commands_need_the_screen(clock, tmp_path):
         run,
     )
     assert service.handle_command("next-page") == "error: mini screen not connected"
+
+
+# --- State -------------------------------------------------------------------------------
+
+
+def test_state_follows_the_connection(clock, screen, tmp_path):
+    from minitela.service import State, Status
+
+    states = []
+    outcomes = iter(
+        [
+            DeviceNotFoundError("no"),
+            DevicePermissionError("/dev/ttyACM0"),
+            TransportError("busy"),
+            "connect",
+        ]
+    )
+
+    def open_transport():
+        outcome = next(outcomes)
+        if isinstance(outcome, Exception):
+            raise outcome
+        transport = FakeTransport(screen)
+        transport.port = "/dev/ttyACM0"
+        return transport
+
+    run = Run(clock, steps=4)
+    service = make_service(clock, open_transport, tmp_path / "s.json", [], run)
+    assert service.state == State(Status.STARTING)
+    service.add_listener(states.append)
+    service.run()
+    assert states == [
+        State(Status.NOT_FOUND),
+        State(Status.NO_PERMISSION, "/dev/ttyACM0"),
+        State(Status.UNAVAILABLE, "busy"),
+        State(Status.CONNECTED, "/dev/ttyACM0"),
+    ]
+
+
+def test_failing_listener_is_logged(clock, screen, tmp_path, caplog):
+    def broken(state):
+        raise RuntimeError("boom")
+
+    run = Run(clock, steps=1)
+    service = make_service(clock, lambda: FakeTransport(screen), tmp_path / "s.json", [], run)
+    service.add_listener(broken)
+    service.run()
+    assert "state listener failed" in caplog.text

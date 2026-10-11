@@ -2,11 +2,21 @@ import itertools
 import signal
 import threading
 
-from gi.repository import Gio
+from gi.repository import Gio, GLib
 
+from minitela.service import State, Status
 from minitela.ui import app as app_module
 from minitela.ui.app import MinitelaApp
 from minitela.ui.window import MainWindow
+
+
+class FakeService:
+    def __init__(self):
+        self.state = State(Status.STARTING)
+        self.listeners = []
+
+    def add_listener(self, callback):
+        self.listeners.append(callback)
 
 
 class FakeRunner:
@@ -14,6 +24,7 @@ class FakeRunner:
         self.refuse = refuse
         self.events = []
         self.stopped = None
+        self.service = FakeService()
 
     def start(self):
         if self.refuse:
@@ -108,3 +119,44 @@ def test_signal_handler_fallback(monkeypatch):
 
 def _no_glibunix(namespace, version):
     raise ValueError(f"Namespace {namespace} not available")
+
+
+def run_pending():
+    """Run what the service's thread scheduled on the main loop."""
+    context = GLib.MainContext.default()
+    while context.pending():
+        context.iteration(False)
+
+
+def test_state_reaches_the_window():
+    runner = FakeRunner()
+    app = make_app(runner)
+    app.register(None)
+    app.activate()
+    window = app.get_windows()[0]
+    assert not window.banner.get_revealed()
+    (listener,) = runner.service.listeners
+    listener(State(Status.NOT_FOUND))  # called from the service's thread in real life
+    run_pending()
+    assert window.banner.get_revealed()
+    assert window.banner.get_title() == "Mini screen not found"
+    app.do_shutdown()
+
+
+def test_state_before_the_window_exists():
+    runner = FakeRunner()
+    app = make_app(runner)
+    app.register(None)
+    runner.service.listeners[0](State(Status.NO_PERMISSION, "/dev/ttyACM0"))
+    run_pending()
+    app.activate()
+    assert app.get_windows()[0].banner.get_button_label() == "How to fix"
+    app.do_shutdown()
+
+
+def test_window_without_own_service():
+    app = make_app(FakeRunner(refuse=True))
+    app.register(None)
+    app.activate()
+    assert "Another Minitela process" in app.get_windows()[0].banner.get_title()
+    app.do_shutdown()

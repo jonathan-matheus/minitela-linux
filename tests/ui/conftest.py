@@ -19,9 +19,10 @@ def no_windows_on_screen(monkeypatch):
     monkeypatch.setattr(Gtk.Window, "present", lambda self: None)
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def adw_app():
-    """A registered application that does not claim the real app ID on the session bus."""
+    """A registered application to own test windows. One per test session: two apps with
+    the same ID clash in one process. It does not claim the real app ID."""
     app = Adw.Application(application_id="dev.pragmatico.Minitela.Tests")
     app.set_flags(Gio.ApplicationFlags.NON_UNIQUE)
     app.register(None)
