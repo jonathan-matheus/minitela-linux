@@ -38,3 +38,6 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
 testpaths = ["tests"]
 addopts = "-ra --import-mode=importlib"
 pythonpath = ["tests"]
+
+[tool.coverage.report]
+exclude_also = ["@abstractmethod"]
