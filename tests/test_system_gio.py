@@ -12,7 +12,16 @@ gi.require_version("Gio", "2.0")
 from gi.repository import Gio, GLib  # noqa: E402
 
 from minitela.dbus import BusError  # noqa: E402
-from minitela.system_gio import LOGIN1, MANAGER, MANAGER_PATH, SleepMonitor  # noqa: E402
+from minitela.system_gio import (  # noqa: E402
+    LOGIN1,
+    MANAGER,
+    MANAGER_PATH,
+    SESSION,
+    LockMonitor,
+    SleepMonitor,
+)
+
+SESSION_PATH = "/org/freedesktop/login1/session/_31"
 
 pytestmark = pytest.mark.skipif(not shutil.which("dbus-daemon"), reason="needs dbus-daemon")
 
@@ -27,6 +36,9 @@ INTROSPECTION = Gio.DBusNodeInfo.new_for_xml(
           <arg type="s" direction="in"/><arg type="s" direction="in"/>
           <arg type="s" direction="in"/><arg type="s" direction="in"/>
           <arg type="h" direction="out"/>
+        </method>
+        <method name="GetSession">
+          <arg type="s" direction="in"/><arg type="o" direction="out"/>
         </method>
         <signal name="PrepareForSleep"><arg type="b"/></signal>
       </interface>
@@ -54,6 +66,16 @@ class FakeLogind:
         self._thread.join()
         for _, read_end in self.inhibitors:
             os.close(read_end)
+
+    def emit_locked_hint(self, locked: bool, path: str = SESSION_PATH):
+        changed = {"LockedHint": GLib.Variant("b", locked)}
+        self.connection.emit_signal(
+            None,
+            path,
+            "org.freedesktop.DBus.Properties",
+            "PropertiesChanged",
+            GLib.Variant("(sa{sv}as)", (SESSION, changed, [])),
+        )
 
     def emit_sleep(self, going_to_sleep: bool):
         self.connection.emit_signal(
@@ -91,6 +113,9 @@ class FakeLogind:
         self._context.pop_thread_default()
 
     def _method(self, connection, sender, path, interface, method, parameters, invocation):
+        if method == "GetSession":
+            invocation.return_value(GLib.Variant("(o)", (SESSION_PATH,)))
+            return
         if self.refuse:
             invocation.return_dbus_error("org.freedesktop.DBus.Error.AccessDenied", "no")
             return
@@ -200,3 +225,120 @@ def test_system_bus_by_default(monkeypatch, bus, logind):
     assert monitor.inhibiting
     monitor.stop()
     connection.close_sync(None)
+
+
+# --- LockMonitor ----------------------------------------------------------------------------
+
+
+@pytest.fixture
+def session_bus():
+    test_bus = Gio.TestDBus.new(Gio.TestDBusFlags.NONE)
+    test_bus.up()
+    yield test_bus.get_bus_address()
+    test_bus.down()
+
+
+@pytest.fixture
+def screensaver(session_bus):
+    """Emits ScreenSaver.ActiveChanged like a desktop's screen saver."""
+    connection = Gio.DBusConnection.new_for_address_sync(session_bus, FLAGS, None, None)
+
+    def emit(interface, active):
+        connection.emit_signal(
+            None,
+            "/org/freedesktop/ScreenSaver",
+            interface,
+            "ActiveChanged",
+            GLib.Variant("(b)", (active,)),
+        )
+        connection.flush_sync(None)
+
+    yield emit
+    connection.close_sync(None)
+
+
+def test_lock_from_logind(bus, logind, session_bus):
+    events = Events()
+    monitor = LockMonitor(events, bus, session_bus)
+    monitor.start()
+    assert monitor.listening == ["logind", "screensaver"]
+    logind.emit_locked_hint(True)
+    events.wait()
+    logind.emit_locked_hint(False)
+    events.wait()
+    monitor.stop()
+    assert events.received == [True, False]
+
+
+def test_other_sessions_and_properties_are_ignored(bus, logind, session_bus):
+    events = Events()
+    monitor = LockMonitor(events, bus, session_bus)
+    monitor.start()
+    logind.emit_locked_hint(True, path="/org/freedesktop/login1/session/_32")
+    logind.connection.emit_signal(
+        None,
+        SESSION_PATH,
+        "org.freedesktop.DBus.Properties",
+        "PropertiesChanged",
+        GLib.Variant("(sa{sv}as)", (SESSION, {"Active": GLib.Variant("b", True)}, [])),
+    )
+    logind.emit_locked_hint(True)
+    events.wait()
+    monitor.stop()
+    assert events.received == [True]
+
+
+@pytest.mark.parametrize("interface", ["org.freedesktop.ScreenSaver", "org.gnome.ScreenSaver"])
+def test_lock_from_screensaver(bus, logind, session_bus, screensaver, interface):
+    events = Events()
+    monitor = LockMonitor(events, bus, session_bus)
+    monitor.start()
+    screensaver(interface, True)
+    events.wait()
+    screensaver(interface, True)  # repeated: reported once
+    screensaver(interface, False)
+    events.wait()
+    monitor.stop()
+    assert events.received == [True, False]
+
+
+def test_failing_lock_handler(bus, logind, session_bus, screensaver, caplog):
+    called = threading.Event()
+
+    def broken(locked):
+        called.set()
+        raise RuntimeError("boom")
+
+    monitor = LockMonitor(broken, bus, session_bus)
+    monitor.start()
+    screensaver("org.gnome.ScreenSaver", True)
+    assert called.wait(2)
+    monitor.stop()
+    assert "lock handler failed" in caplog.text
+
+
+def test_lock_without_logind(bus, session_bus):
+    monitor = LockMonitor(lambda locked: None, bus, session_bus)
+    monitor.start()
+    assert monitor.listening == ["screensaver"]
+    monitor.stop()
+
+
+def test_lock_without_any_bus():
+    nowhere = "unix:path=/nonexistent/bus"
+    with pytest.raises(BusError, match=r"logind.*session bus"):
+        LockMonitor(lambda locked: None, nowhere, nowhere).start()
+
+
+def test_lock_monitor_uses_the_real_buses_by_default(monkeypatch, bus, logind, session_bus):
+    connections = {
+        Gio.BusType.SYSTEM: Gio.DBusConnection.new_for_address_sync(bus, FLAGS, None, None),
+        Gio.BusType.SESSION: Gio.DBusConnection.new_for_address_sync(
+            session_bus, FLAGS, None, None
+        ),
+    }
+    monkeypatch.setattr(Gio, "bus_get_sync", lambda kind: connections[kind])
+    monitor = LockMonitor(lambda locked: None)
+    monitor.start()
+    assert monitor.listening == ["logind", "screensaver"]
+    monitor.stop()

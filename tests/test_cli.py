@@ -13,7 +13,9 @@ from minitela.transport.discovery import SerialDevice
 from minitela.transport.fake import FakeTransport, SimulatedScreen
 
 MINITELA = SerialDevice("/dev/ttyACM0", "0324", "0324", "sxw-admin_CDC_DEMO")
-REAL_SLEEP_MONITOR = cli._sleep_monitor  # replaced in every test by the sleep_monitors fixture
+# Replaced in every test by the system_monitors fixture.
+REAL_SLEEP_MONITOR = cli._sleep_monitor
+REAL_LOCK_MONITOR = cli._lock_monitor
 
 
 @pytest.fixture(autouse=True)
@@ -539,15 +541,19 @@ def services(monkeypatch, config_home):
 
 
 @pytest.fixture(autouse=True)
-def sleep_monitors(monkeypatch):
-    """Never take a real logind inhibitor in tests."""
-    created = []
+def system_monitors(monkeypatch):
+    """Never touch the real logind or screen saver in tests: {"sleep": [...], "lock": [...]}."""
+    created = {"sleep": [], "lock": []}
 
-    def make(on_sleep):
-        created.append(FakeMonitor(on_sleep))
-        return created[-1]
+    def factory(kind):
+        def make(callback):
+            created[kind].append(FakeMonitor(callback))
+            return created[kind][-1]
 
-    monkeypatch.setattr(cli, "_sleep_monitor", make)
+        return make
+
+    monkeypatch.setattr(cli, "_sleep_monitor", factory("sleep"))
+    monkeypatch.setattr(cli, "_lock_monitor", factory("lock"))
     return created
 
 
@@ -578,14 +584,15 @@ def test_run(monkeypatch, services, monitors, caplog):
     assert "running" in caplog.text
 
 
-def test_run_blanks_on_suspend(monkeypatch, services, monitors, sleep_monitors):
+def test_run_blanks_on_suspend_and_lock(monkeypatch, services, monitors, system_monitors):
     created, _ = services
     monkeypatch.setattr(cli, "_system_bus", lambda: None)
     cli.main(["run"])
-    (sleep_monitor,) = sleep_monitors
+    (sleep_monitor,), (lock_monitor,) = system_monitors["sleep"], system_monitors["lock"]
     sleep_monitor.callback(True)
-    assert created[0].blanked == [("sleep", True)]
-    assert not sleep_monitor.running
+    lock_monitor.callback(True)
+    assert created[0].blanked == [("sleep", True), ("lock", True)]
+    assert not sleep_monitor.running and not lock_monitor.running
 
 
 def test_run_without_logind(monkeypatch, services, monitors, caplog):
@@ -600,6 +607,13 @@ def test_default_sleep_monitor():
     from minitela.system_gio import SleepMonitor
 
     assert isinstance(REAL_SLEEP_MONITOR(lambda s: None), SleepMonitor)
+
+
+def test_default_lock_monitor():
+    pytest.importorskip("gi")
+    from minitela.system_gio import LockMonitor
+
+    assert isinstance(REAL_LOCK_MONITOR(lambda locked: None), LockMonitor)
 
 
 def test_run_without_notifications_or_system_bus(monkeypatch, services, caplog):

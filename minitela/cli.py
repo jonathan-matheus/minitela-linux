@@ -333,6 +333,23 @@ def _sleep_monitor(on_sleep):
     return SleepMonitor(on_sleep)
 
 
+def _lock_monitor(on_lock):
+    from minitela.system_gio import LockMonitor
+
+    return LockMonitor(on_lock)
+
+
+def _start_monitor(make, callback, failure: str):
+    """Start a system event monitor, or log `failure` and return None."""
+    try:
+        monitor = make(callback)
+        monitor.start()
+    except (BusError, ImportError) as error:
+        log.warning("%s: %s", failure, error)
+        return None
+    return monitor
+
+
 def _run(args: argparse.Namespace) -> int:
     """Keep the mini screen updated until Ctrl+C or SIGTERM."""
     if not args.verbose:
@@ -351,13 +368,18 @@ def _run(args: argparse.Namespace) -> int:
         lambda settings: build_sources(settings, system_bus, notifications),
         settings_path(),
     )
-    sleep_monitor = None
-    try:
-        sleep_monitor = _sleep_monitor(lambda sleeping: service.set_blanked("sleep", sleeping))
-        sleep_monitor.start()
-    except (BusError, ImportError) as error:
-        log.warning("cannot blank the screen on suspend: %s", error)
-        sleep_monitor = None
+    system_monitors = [
+        _start_monitor(
+            _sleep_monitor,
+            lambda sleeping: service.set_blanked("sleep", sleeping),
+            "cannot blank the screen on suspend",
+        ),
+        _start_monitor(
+            _lock_monitor,
+            lambda locked: service.set_blanked("lock", locked),
+            "cannot blank the screen on lock",
+        ),
+    ]
     signal.signal(signal.SIGTERM, lambda signum, frame: service.stop())
     log.info("running; press Ctrl+C to stop")
     try:
@@ -365,7 +387,7 @@ def _run(args: argparse.Namespace) -> int:
     except KeyboardInterrupt:
         pass
     finally:
-        for running in (monitor, sleep_monitor):
+        for running in (monitor, *system_monitors):
             if running is not None:
                 running.stop()
     return 0
