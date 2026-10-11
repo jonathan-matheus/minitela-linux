@@ -21,6 +21,9 @@ classifiers = [
 [project.scripts]
 minitela = "minitela.cli:main"
 
+[project.gui-scripts]
+minitela-app = "minitela.ui.app:main"
+
 [dependency-groups]
 dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.6"]
 
@@ -42,6 +45,7 @@ filterwarnings = [
     # Deprecations inside PyGObject itself, and the API the fake logind uses in tests.
     "ignore::DeprecationWarning:gi.events",
     "ignore:GLib.unix_signal_add_full is deprecated",
+    "ignore:GLib.unix_signal_add is deprecated",
     "ignore:Gio.DBusConnection.register_object is deprecated",
 ]
 

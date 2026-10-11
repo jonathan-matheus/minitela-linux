@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Minitela
+GenericName=Mini screen settings
+Comment=Show the time, weather, battery and messages on the Positivo Vision mini screen
+Exec=minitela-app
+Icon=dev.pragmatico.Minitela
+Terminal=false
+Categories=Utility;GTK;
+Keywords=Positivo;Vision;mini screen;minitela;
+StartupNotify=true
