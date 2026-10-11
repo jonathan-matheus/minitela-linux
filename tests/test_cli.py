@@ -197,3 +197,37 @@ def test_unknown_tag(plugged, capsys):
         cli.main(["get-tag", "nope"])
     assert exc.value.code == 2
     assert "minitela tags" in capsys.readouterr().err
+
+
+@pytest.fixture
+def data_home(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    return tmp_path
+
+
+def test_import_deb_and_list_gifs(data_home, tmp_path, capsys):
+    from test_assets import make_deb
+
+    deb = make_deb(
+        tmp_path / "minitela.deb",
+        {
+            "./usr/share/minitela/resources/ACF/Texture7.acf": b"t" * 2048,
+            "./usr/share/minitela/resources/gifs_imagens/7.gif": b"g",
+        },
+    )
+    assert cli.main(["import-deb", str(deb)]) == 0
+    assert "Imported 1 factory GIFs" in capsys.readouterr().out
+    assert cli.main(["gifs"]) == 0
+    assert "  7  " in capsys.readouterr().out
+
+
+def test_import_invalid_deb(data_home, tmp_path, capsys):
+    bad = tmp_path / "bad.deb"
+    bad.write_bytes(b"nope")
+    assert cli.main(["import-deb", str(bad)]) == 1
+    assert "not a .deb" in capsys.readouterr().err
+
+
+def test_gifs_before_import(data_home, capsys):
+    assert cli.main(["gifs"]) == 1
+    assert "import-deb" in capsys.readouterr().err

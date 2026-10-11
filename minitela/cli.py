@@ -5,8 +5,10 @@ import logging
 import sys
 from collections.abc import Callable
 from datetime import datetime
+from pathlib import Path
 
 from minitela import __version__
+from minitela.assets import InvalidPackageError, import_deb, library_dir, load_library
 from minitela.device import PAGE_COUNT, Device
 from minitela.protocol import tags
 from minitela.protocol.commands import ProtocolError
@@ -108,6 +110,24 @@ def _set_tag(args: argparse.Namespace) -> int:
     return 0
 
 
+def _import_deb(args: argparse.Namespace) -> int:
+    try:
+        gifs = import_deb(args.deb)
+    except InvalidPackageError as error:
+        return _fail(str(error))
+    print(f"Imported {len(gifs)} factory GIFs into {library_dir()}")
+    return 0
+
+
+def _list_gifs(args: argparse.Namespace) -> int:
+    gifs = load_library()
+    if not gifs:
+        return _fail("no factory GIFs yet: run 'minitela import-deb <official .deb>'")
+    for gif in gifs:
+        print(f"{gif.number:3d}  {gif.size / 1024 / 1024:5.2f} MiB  {library_dir() / gif.preview}")
+    return 0
+
+
 def _page_number(value: str) -> int:
     """A page number or name (whatsapp, reminder, system_info, weather, gif1...)."""
     names = ", ".join(page.name.lower() for page in tags.Page)
@@ -152,6 +172,13 @@ def build_parser() -> argparse.ArgumentParser:
     set_tag.add_argument("tag", type=_tag)
     set_tag.add_argument("value")
     set_tag.set_defaults(handler=_set_tag)
+    import_cmd = subcommands.add_parser(
+        "import-deb", help="import the factory GIFs from the official .deb package"
+    )
+    import_cmd.add_argument("deb", type=Path)
+    import_cmd.set_defaults(handler=_import_deb)
+    gifs = subcommands.add_parser("gifs", help="list the imported factory GIFs")
+    gifs.set_defaults(handler=_list_gifs)
     return parser
 
 
