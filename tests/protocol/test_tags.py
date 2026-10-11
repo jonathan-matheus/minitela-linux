@@ -76,3 +76,22 @@ def test_device_clock():
     moment = datetime(2026, 10, 11, 14, 5, 9)
     assert tags.clock_date(moment) == 0x20261011
     assert tags.clock_time(moment) == 0x140509
+
+
+@pytest.mark.parametrize(
+    ("text", "wrapped"),
+    [
+        ("", ""),
+        ("curto", "curto"),
+        (
+            "Isso e apenas um teste, por favor respeite o teste.",
+            "Isso e apenas um\nteste, por favor\nrespeite o\nteste.",
+        ),
+        ("linha 1\nlinha 2", "linha 1\nlinha 2"),
+        ("antes\n\ndepois", "antes\n\ndepois"),
+        ("palavragrandedemaisparaumalinha", "palavragrandedem\naisparaumalinha"),
+        ("guarda-chuva amarelo", "guarda-chuva\namarelo"),
+    ],
+)
+def test_wrap_lines(text, wrapped):
+    assert tags.wrap_lines(text, 16) == wrapped

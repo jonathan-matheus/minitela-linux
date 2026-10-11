@@ -13,6 +13,7 @@ from minitela.assets import InvalidPackageError, import_deb, library_dir, load_l
 from minitela.device import PAGE_COUNT, Device
 from minitela.protocol import tags
 from minitela.protocol.commands import ProtocolError
+from minitela.sources.reminder import ReminderSource, ReminderStore
 from minitela.sources.weather import WeatherSource, search_cities
 from minitela.transport.base import ResponseTimeout, TransportError
 from minitela.transport.connection import (
@@ -200,6 +201,22 @@ def _weather(args: argparse.Namespace) -> int:
     return 0
 
 
+def _reminder(args: argparse.Namespace) -> int:
+    store = ReminderStore()
+    if args.clear:
+        store.save("")
+    elif args.text is not None:
+        store.save(args.text)
+    text = ReminderSource(store).read()[tags.REMINDER]
+    print(text or "(no reminder)")
+    if args.send:
+        device = _connected(args)
+        with device.transport:
+            device.set_tag(tags.REMINDER, text)
+            device.show_page(tags.Page.REMINDER)
+    return 0
+
+
 def _page_number(value: str) -> int:
     """A page number or name (whatsapp, reminder, system_info, weather, gif1...)."""
     names = ", ".join(page.name.lower() for page in tags.Page)
@@ -265,6 +282,11 @@ def build_parser() -> argparse.ArgumentParser:
     weather.add_argument("city")
     weather.add_argument("--send", action="store_true", help="also show it on the mini screen")
     weather.set_defaults(handler=_weather)
+    reminder = subcommands.add_parser("reminder", help="show or change the reminder")
+    reminder.add_argument("text", nargs="?", help="new reminder text")
+    reminder.add_argument("--clear", action="store_true", help="remove the reminder")
+    reminder.add_argument("--send", action="store_true", help="also show it on the mini screen")
+    reminder.set_defaults(handler=_reminder)
     return parser
 
 

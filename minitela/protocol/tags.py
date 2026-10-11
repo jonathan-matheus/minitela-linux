@@ -5,6 +5,7 @@ documented in docs/registers.md. Text formats follow what the official app sends
 (tests/fixtures/).
 """
 
+import textwrap
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum, IntEnum
@@ -124,6 +125,23 @@ def page_name(number: int) -> str:
 
 DISCONNECTED = "Desconectado"
 _NAME_LIMIT = 9
+
+
+# Characters per line in the layout's text boxes: the official app fits "respeite o teste."
+# (17) in the reminder, and the message box sample text is lines of 16 digits.
+REMINDER_LINE = 17
+MESSAGE_LINE = 16
+
+
+def wrap_lines(text: str, width: int) -> str:
+    """Break text into lines that fit the layout's text boxes, keeping the user's line breaks.
+
+    The device does not wrap text by itself; the official app breaks lines the same way.
+    """
+    lines = []
+    for paragraph in text.splitlines() or [""]:
+        lines += textwrap.wrap(paragraph, width, break_on_hyphens=False) or [""]
+    return "\n".join(lines).strip("\n")
 
 
 def battery_text(percent: int) -> str:

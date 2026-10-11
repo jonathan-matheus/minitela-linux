@@ -349,3 +349,20 @@ def test_weather_send(open_meteo, plugged, screen):
 def test_weather_unknown_city(open_meteo, capsys):
     assert cli.main(["weather", "nowhere"]) == 1
     assert "no city found" in capsys.readouterr().err
+
+
+def test_reminder(data_home, capsys):
+    assert cli.main(["reminder"]) == 0
+    assert "(no reminder)" in capsys.readouterr().out
+    assert cli.main(["reminder", "Comprar pão e leite na padaria"]) == 0
+    assert capsys.readouterr().out == "Comprar pão e\nleite na padaria\n"
+    assert cli.main(["reminder"]) == 0
+    assert "Comprar pão" in capsys.readouterr().out
+    assert cli.main(["reminder", "--clear"]) == 0
+    assert "(no reminder)" in capsys.readouterr().out
+
+
+def test_reminder_send(data_home, plugged, screen):
+    assert cli.main(["reminder", "Beber água", "--send"]) == 0
+    assert screen.texts[1090] == "Beber água".encode()
+    assert screen.numbers[2] == 2
