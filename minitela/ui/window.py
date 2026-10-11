@@ -12,6 +12,7 @@ from minitela.service import State, Status  # noqa: E402
 from minitela.ui.screens import ScreensPage  # noqa: E402
 from minitela.ui.setup import host_setup_command  # noqa: E402
 from minitela.ui.store import SettingsStore  # noqa: E402
+from minitela.ui.weather import WeatherPage  # noqa: E402
 
 
 class MainWindow(Adw.ApplicationWindow):
@@ -27,9 +28,9 @@ class MainWindow(Adw.ApplicationWindow):
         self._command = command
         self.stack = Adw.ViewStack()
         self.screens = ScreensPage(store, self.show_page, self.preview_brightness)
-        self.stack.add_titled_with_icon(
-            self.screens, "screen", self.screens.get_title(), self.screens.get_icon_name()
-        )
+        self.weather = WeatherPage(store)
+        for name, page in (("screen", self.screens), ("weather", self.weather)):
+            self.stack.add_titled_with_icon(page, name, page.get_title(), page.get_icon_name())
         self.header = Adw.HeaderBar(
             title_widget=Adw.ViewSwitcher(stack=self.stack, policy=Adw.ViewSwitcherPolicy.WIDE)
         )
