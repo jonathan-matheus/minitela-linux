@@ -1,0 +1,7 @@
+# Minitela Linux: map the laptop's mini screen key to KEY_PROG1.
+#
+# Without this the key's scancode has no keycode. Scancodes from the official package;
+# 0x67 is used by the N15EPE-S and 0x6a by the P15x models.
+evdev:input:b0011v0001p0001eAB83*
+ KEYBOARD_KEY_67=prog1
+ KEYBOARD_KEY_6a=prog1

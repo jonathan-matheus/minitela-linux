@@ -1,0 +1,6 @@
+# Minitela Linux: let the logged-in user open the Positivo Vision R15M mini screen.
+#
+# The mini screen is a USB serial (CDC ACM) device. "uaccess" grants access only to the user
+# of the active local session, through an ACL, instead of opening the port to everyone.
+# The tag is applied by 73-seat-late.rules, so this file must sort before it.
+SUBSYSTEM=="tty", KERNEL=="ttyACM*", ATTRS{idVendor}=="0324", ATTRS{idProduct}=="0324", TAG+="uaccess"
