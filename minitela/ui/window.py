@@ -8,6 +8,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gio, Gtk  # noqa: E402
 
+from minitela.i18n import _  # noqa: E402
 from minitela.service import State, Status  # noqa: E402
 from minitela.sources.reminder import ReminderStore  # noqa: E402
 from minitela.ui.gifs import GifsPage, Upload  # noqa: E402
@@ -43,7 +44,7 @@ class MainWindow(Adw.ApplicationWindow):
         ):
             self.stack.add_titled_with_icon(page, name, page.get_title(), page.get_icon_name())
         menu = Gio.Menu()
-        menu.append("Quit (stop updating the mini screen)", "app.quit")
+        menu.append(_("Quit (stop updating the mini screen)"), "app.quit")
         self.header = Adw.HeaderBar(
             title_widget=Adw.ViewSwitcher(stack=self.stack, policy=Adw.ViewSwitcherPolicy.WIDE)
         )
@@ -64,7 +65,7 @@ class MainWindow(Adw.ApplicationWindow):
         """Ask the service to show `page` now."""
         reply = self._command(f"page {page}")
         if not reply.startswith("ok"):
-            self.notify(f"Could not show the page: {reply}")
+            self.notify(_("Could not show the page: {reason}").format(reason=reply))
 
     def notify(self, message: str) -> None:
         self.toasts.add_toast(Adw.Toast(title=message))
@@ -73,13 +74,13 @@ class MainWindow(Adw.ApplicationWindow):
         """Explain on a banner why the screen is not being updated; None: another process
         drives it."""
         if state is None:
-            self._banner("Another Minitela process is driving the mini screen")
+            self._banner(_("Another Minitela process is driving the mini screen"))
         elif state.status is Status.NO_PERMISSION:
-            self._banner("No permission to use the mini screen", button="How to fix")
+            self._banner(_("No permission to use the mini screen"), button=_("How to fix"))
         elif state.status is Status.NOT_FOUND:
-            self._banner("Mini screen not found")
+            self._banner(_("Mini screen not found"))
         elif state.status is Status.UNAVAILABLE:
-            self._banner(f"Mini screen not responding ({state.detail})")
+            self._banner(_("Mini screen not responding ({reason})").format(reason=state.detail))
         else:
             self.banner.set_revealed(False)
 
@@ -91,16 +92,16 @@ class MainWindow(Adw.ApplicationWindow):
     def show_setup_dialog(self) -> Adw.AlertDialog:
         command = host_setup_command()
         dialog = Adw.AlertDialog(
-            heading="Allow access to the mini screen",
-            body=(
+            heading=_("Allow access to the mini screen"),
+            body=_(
                 "Run this once in a terminal. It lets the logged-in user use the mini screen "
                 "and its keyboard key, and asks for your password."
             ),
         )
         label = Gtk.Label(label=command, selectable=True, wrap=True, css_classes=["monospace"])
         dialog.set_extra_child(label)
-        dialog.add_response("close", "Close")
-        dialog.add_response("copy", "Copy command")
+        dialog.add_response("close", _("Close"))
+        dialog.add_response("copy", _("Copy command"))
         dialog.set_default_response("copy")
         dialog.connect("response", self._on_setup_response, command)
         dialog.present(self)

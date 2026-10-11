@@ -25,10 +25,13 @@ minitela = "minitela.cli:main"
 minitela-app = "minitela.ui.app:main"
 
 [dependency-groups]
-dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.6"]
+dev = ["hatchling", "pytest>=8", "pytest-cov>=5", "ruff>=0.6"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["minitela"]
+
+# Compiles po/*.po into minitela/locale/ (hatch_build.py).
+[tool.hatch.build.targets.wheel.hooks.custom]
 
 [tool.ruff]
 line-length = 100

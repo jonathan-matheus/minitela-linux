@@ -9,15 +9,16 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, GLib, Gtk  # noqa: E402
 
 from minitela.dbus import BusError  # noqa: E402
+from minitela.i18n import _  # noqa: E402
 from minitela.protocol.tags import Page  # noqa: E402
 from minitela.ui.autostart import set_autostart  # noqa: E402
 from minitela.ui.store import SettingsStore  # noqa: E402
 
 PAGE_TITLES = {
     Page.WHATSAPP: "WhatsApp",
-    Page.REMINDER: "Reminder",
-    Page.SYSTEM_INFO: "Battery and connections",
-    Page.WEATHER: "Weather",
+    Page.REMINDER: _("Reminder"),
+    Page.SYSTEM_INFO: _("Battery and connections"),
+    Page.WEATHER: _("Weather"),
     Page.GIF1: "GIF",
 }
 DEFAULT_ROTATION = 15
@@ -33,7 +34,7 @@ class ScreensPage(Adw.PreferencesPage):
         notify: Callable[[str], None] = lambda message: None,
         set_autostart: Callable[[bool], None] = set_autostart,
     ):
-        super().__init__(title="Screen", icon_name="video-display-symbolic")
+        super().__init__(title=_("Screen"), icon_name="video-display-symbolic")
         self._store = store
         self._show_page = show_page
         self._preview_brightness = preview_brightness
@@ -41,28 +42,28 @@ class ScreensPage(Adw.PreferencesPage):
         self._set_autostart = set_autostart
         self._save_source = 0
 
-        brightness = Adw.PreferencesGroup(title="Brightness")
+        brightness = Adw.PreferencesGroup(title=_("Brightness"))
         self.brightness = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 5)
         self.brightness.set_value(store.settings.brightness)
         self.brightness.set_hexpand(True)
         self.brightness.set_draw_value(True)
         self.brightness.set_value_pos(Gtk.PositionType.RIGHT)
         self.brightness.connect("value-changed", self._on_brightness_changed)
-        row = Adw.ActionRow(title="Backlight", activatable_widget=self.brightness)
+        row = Adw.ActionRow(title=_("Backlight"), activatable_widget=self.brightness)
         row.add_suffix(self.brightness)
         brightness.add(row)
         self.add(brightness)
 
         pages = Adw.PreferencesGroup(
-            title="Pages",
-            description="The pages the mini screen rotates through and the key switches between",
+            title=_("Pages"),
+            description=_("The pages the mini screen rotates through and the key switches between"),
         )
         self.page_rows: dict[int, Adw.SwitchRow] = {}
         for page, title in PAGE_TITLES.items():
             row = Adw.SwitchRow(title=title, active=page in store.settings.pages)
             show = Gtk.Button(
                 icon_name="view-reveal-symbolic",
-                tooltip_text="Show now",
+                tooltip_text=_("Show now"),
                 valign=Gtk.Align.CENTER,
                 css_classes=["flat"],
             )
@@ -73,11 +74,11 @@ class ScreensPage(Adw.PreferencesPage):
             self.page_rows[page] = row
         self.add(pages)
 
-        rotation = Adw.PreferencesGroup(title="Rotation")
+        rotation = Adw.PreferencesGroup(title=_("Rotation"))
         seconds = store.settings.rotation_seconds
-        self.rotate_row = Adw.SwitchRow(title="Change pages automatically", active=bool(seconds))
+        self.rotate_row = Adw.SwitchRow(title=_("Change pages automatically"), active=bool(seconds))
         self.interval_row = Adw.SpinRow.new_with_range(5, 600, 5)
-        self.interval_row.set_title("Seconds on each page")
+        self.interval_row.set_title(_("Seconds on each page"))
         self.interval_row.set_value(seconds or DEFAULT_ROTATION)
         self.interval_row.set_sensitive(bool(seconds))
         self.rotate_row.connect("notify::active", self._on_rotation_changed)
@@ -87,11 +88,11 @@ class ScreensPage(Adw.PreferencesPage):
         self.add(rotation)
 
         background = Adw.PreferencesGroup(
-            title="Background",
-            description="The mini screen keeps updating while the window is closed",
+            title=_("Background"),
+            description=_("The mini screen keeps updating while the window is closed"),
         )
         self.autostart_row = Adw.SwitchRow(
-            title="Start with the session", active=store.settings.autostart
+            title=_("Start with the session"), active=store.settings.autostart
         )
         self.autostart_row.connect("notify::active", self._on_autostart_changed)
         background.add(self.autostart_row)
@@ -105,7 +106,9 @@ class ScreensPage(Adw.PreferencesPage):
             self._set_autostart(enabled)
         except (OSError, BusError) as error:
             row.set_active(not enabled)
-            self._notify(f"Could not change starting with the session: {error}")
+            self._notify(
+                _("Could not change starting with the session: {reason}").format(reason=error)
+            )
             return
         self._store.update(autostart=enabled)
 

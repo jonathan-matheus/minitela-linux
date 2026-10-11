@@ -11,6 +11,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
 from minitela.assets import FactoryGif, import_deb, library_dir, load_library  # noqa: E402
+from minitela.i18n import _, ngettext  # noqa: E402
 from minitela.ui.background import Background, in_background  # noqa: E402
 
 Upload = Callable[[bytes, Callable[[int, int], None]], None]
@@ -26,22 +27,24 @@ class GifsPage(Adw.PreferencesPage):
         library: Path | None = None,
     ):
         """`upload` is None when another process drives the screen."""
-        super().__init__(title="GIFs", icon_name="image-x-generic-symbolic")
+        super().__init__(title=_("GIFs"), icon_name="image-x-generic-symbolic")
         self._upload = upload
         self._notify = notify
         self._background = background
         self._library = library or library_dir()
 
         self.group = Adw.PreferencesGroup(
-            title="Factory GIFs",
-            description="Sending a GIF rewrites the mini screen's layout and takes about 10 s",
+            title=_("Factory GIFs"),
+            description=_("Sending a GIF rewrites the mini screen's layout and takes about 10 s"),
         )
-        self.import_button = Gtk.Button(label="Import official package…", valign=Gtk.Align.CENTER)
+        self.import_button = Gtk.Button(
+            label=_("Import official package…"), valign=Gtk.Align.CENTER
+        )
         self.import_button.connect("clicked", lambda button: self.choose_package())
         self.group.set_header_suffix(self.import_button)
 
         self.empty = Gtk.Label(
-            label=(
+            label=_(
                 "No GIFs yet. Import the official package (minitela_*.deb) to get the "
                 "21 factory GIFs."
             ),
@@ -86,7 +89,9 @@ class GifsPage(Adw.PreferencesPage):
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
             box.append(picture)
             box.append(Gtk.Label(label=str(gif.number), css_classes=["caption"]))
-            child = Gtk.FlowBoxChild(child=box, tooltip_text=f"GIF {gif.number}")
+            child = Gtk.FlowBoxChild(
+                child=box, tooltip_text=_("GIF {number}").format(number=gif.number)
+            )
             child.gif = gif
             self.grid.append(child)
         self.empty.set_visible(not gifs)
@@ -94,17 +99,17 @@ class GifsPage(Adw.PreferencesPage):
 
     def _on_gif_activated(self, grid: Gtk.FlowBox, child: Gtk.FlowBoxChild) -> None:
         if self._upload is None:
-            self._notify("Close the other Minitela process to send GIFs from here")
+            self._notify(_("Close the other Minitela process to send GIFs from here"))
             return
         dialog = Adw.AlertDialog(
-            heading=f"Send GIF {child.gif.number}?",
-            body=(
+            heading=_("Send GIF {number}?").format(number=child.gif.number),
+            body=_(
                 "The mini screen reloads its layout with this GIF. It takes about 10 seconds; "
                 "do not unplug or suspend the laptop meanwhile."
             ),
         )
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("send", "Send")
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("send", _("Send"))
         dialog.set_response_appearance("send", Adw.ResponseAppearance.SUGGESTED)
         dialog.connect("response", lambda d, response: response == "send" and self.send(child.gif))
         dialog.present(self.get_root())
@@ -114,7 +119,7 @@ class GifsPage(Adw.PreferencesPage):
         self.grid.set_sensitive(False)
         self.import_button.set_sensitive(False)
         self.progress.set_fraction(0)
-        self.progress.set_text(f"Sending GIF {gif.number}…")
+        self.progress.set_text(_("Sending GIF {number}…").format(number=gif.number))
         self.progress.set_visible(True)
 
         def report(sent: int, total: int) -> None:  # from the upload's thread
@@ -122,8 +127,12 @@ class GifsPage(Adw.PreferencesPage):
 
         self._background(
             lambda: self._upload(data, report),
-            lambda result: self._finished(f"GIF {gif.number} sent to the mini screen"),
-            lambda error: self._finished(f"Could not send the GIF: {error}"),
+            lambda result: self._finished(
+                _("GIF {number} sent to the mini screen").format(number=gif.number)
+            ),
+            lambda error: self._finished(
+                _("Could not send the GIF: {reason}").format(reason=error)
+            ),
         )
 
     def _show_progress(self, fraction: float) -> bool:
@@ -137,11 +146,11 @@ class GifsPage(Adw.PreferencesPage):
         self._notify(message)
 
     def choose_package(self) -> None:
-        packages = Gtk.FileFilter(name="Debian packages")
+        packages = Gtk.FileFilter(name=_("Debian packages"))
         packages.add_pattern("*.deb")
         filters = Gio.ListStore.new(Gtk.FileFilter)
         filters.append(packages)
-        dialog = Gtk.FileDialog(title="Official Minitela package", filters=filters)
+        dialog = Gtk.FileDialog(title=_("Official Minitela package"), filters=filters)
         dialog.open(self.get_root(), None, self._on_package_chosen)
 
     def _on_package_chosen(self, dialog: Gtk.FileDialog, result: Gio.AsyncResult) -> None:
@@ -162,8 +171,12 @@ class GifsPage(Adw.PreferencesPage):
     def _imported(self, gifs: list[FactoryGif]) -> None:
         self.import_button.set_sensitive(True)
         self.refresh()
-        self._notify(f"Imported {len(gifs)} GIFs")
+        self._notify(
+            ngettext("Imported {count} GIF", "Imported {count} GIFs", len(gifs)).format(
+                count=len(gifs)
+            )
+        )
 
     def _import_failed(self, error: Exception) -> None:
         self.import_button.set_sensitive(True)
-        self._notify(f"Could not import: {error}")
+        self._notify(_("Could not import: {reason}").format(reason=error))

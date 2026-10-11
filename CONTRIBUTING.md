@@ -13,6 +13,9 @@ python3 -m venv --system-site-packages .venv
 
 Sem o PyGObject, os testes que dependem dele são pulados e o resto funciona normalmente.
 
+As traduções precisam do gettext (`msgfmt`), que já vem na maioria das distribuições. A
+instalação compila `po/*.po` em `minitela/locale/`; sem o gettext, a interface fica em inglês.
+
 ## Antes de cada commit
 
 ```sh
@@ -37,6 +40,7 @@ Cada camada só depende das camadas acima dela na lista e pode ser testada sozin
 | `minitela/cli.py` | CLI de diagnóstico, usada para validar cada etapa no hardware. |
 | `minitela/ui/` | App GTK4/libadwaita. |
 | `host/` | Arquivos instalados no sistema host: regra udev e hwdb. |
+| `po/` | Traduções da interface (gettext). |
 | `build-aux/flatpak/` | Manifesto do Flatpak. |
 | `docs/` | Documentação do protocolo e do formato de arquivos. |
 
@@ -46,8 +50,21 @@ Cada camada só depende das camadas acima dela na lista e pode ser testada sozin
   (`feat:`, `fix:`, `test:`, `docs:`, `build:`, `ci:`, `chore:`), com escopo opcional
   (`feat(protocol): ...`).
 - Um commit faz uma coisa só, e o projeto continua passando no lint e nos testes depois dele.
-- Código e comentários em inglês. README, documentação e interface em pt-BR, com tradução
-  via gettext.
+- Código e comentários em inglês. README e documentação em pt-BR.
+- Os textos da interface são escritos em inglês dentro de `_()` e traduzidos em `po/`. Use
+  `_("GIF {number}").format(number=...)`, nunca f-string dentro de `_()`, para o texto poder
+  ser extraído.
+
+## Traduções
+
+```sh
+tools/i18n.sh update     # depois de mudar textos da interface: atualiza po/minitela.pot e po/*.po
+tools/i18n.sh compile    # para ver as traduções sem reinstalar
+tools/i18n.sh add es     # começa uma tradução nova
+```
+
+Um teste falha se algum texto da interface não estiver traduzido em todos os idiomas de `po/`.
+Para testar outro idioma: `LANGUAGE=pt_BR minitela-app`.
 
 ## Engenharia reversa e arquivos do fabricante
 

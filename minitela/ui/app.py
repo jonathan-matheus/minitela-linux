@@ -15,6 +15,7 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
 from minitela import control  # noqa: E402
 from minitela.dbus import BusError  # noqa: E402
+from minitela.i18n import _  # noqa: E402
 from minitela.runner import Runner  # noqa: E402
 from minitela.service import State  # noqa: E402
 from minitela.ui.store import SettingsStore  # noqa: E402
@@ -84,9 +85,9 @@ class MinitelaApp(Adw.Application):
             APP_ID,
             self.activate,
             [
-                ("Open Minitela", self.activate),
-                ("Next page", lambda: self.command("next-page")),
-                ("Quit", self.quit),
+                (_("Open Minitela"), self.activate),
+                (_("Next page"), lambda: self.command("next-page")),
+                (_("Quit"), self.quit),
             ],
             str(SOURCE_ICONS) if SOURCE_ICONS.is_dir() else "",
         )

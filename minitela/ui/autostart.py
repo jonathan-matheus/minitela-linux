@@ -11,6 +11,7 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
+from minitela.i18n import _
 from minitela.paths import config_dir
 from minitela.ui.setup import APP_ID, in_flatpak
 
@@ -65,7 +66,7 @@ def request_background(enabled: bool) -> None:  # pragma: no cover - needs a Fla
     from minitela.dbus import BusError
 
     options = {
-        "reason": GLib.Variant("s", "Keep the mini screen updated after the window is closed"),
+        "reason": GLib.Variant("s", _("Keep the mini screen updated after the window is closed")),
         "autostart": GLib.Variant("b", enabled),
         "commandline": GLib.Variant("as", ["minitela-app", "--background"]),
     }

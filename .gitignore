@@ -10,6 +10,9 @@ build/
 .coverage
 htmlcov/
 
+# Compiled translations (from po/ at build time)
+minitela/locale/
+
 # Flatpak
 .flatpak-builder/
 build-dir/

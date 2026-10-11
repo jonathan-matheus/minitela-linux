@@ -8,6 +8,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gtk  # noqa: E402
 
+from minitela.i18n import _  # noqa: E402
 from minitela.protocol import tags  # noqa: E402
 from minitela.sources.weather import Location, WeatherSource, search_cities  # noqa: E402
 from minitela.ui.background import Background, in_background  # noqa: E402
@@ -18,8 +19,9 @@ SEARCH_DELAY_MS = 500  # wait for the user to stop typing
 
 def forecast_summary(location: Location) -> str:
     values = WeatherSource(location).read()
+    today = _("Today {temperature}").format(temperature=values[tags.CURRENT_TEMPERATURE])
     return (
-        f"Today {values[tags.CURRENT_TEMPERATURE]} · "
+        f"{today} · "
         f"{values[tags.FORECAST1_LABEL]} {values[tags.FORECAST1_TEMPERATURE]} · "
         f"{values[tags.FORECAST2_LABEL]} {values[tags.FORECAST2_TEMPERATURE]}"
     )
@@ -33,22 +35,22 @@ class WeatherPage(Adw.PreferencesPage):
         summary: Callable[[Location], str] = forecast_summary,
         background: Background = in_background,
     ):
-        super().__init__(title="Weather", icon_name="weather-few-clouds-symbolic")
+        super().__init__(title=_("Weather"), icon_name="weather-few-clouds-symbolic")
         self._store = store
         self._search = search
         self._summary = summary
         self._background = background
         self._query = ""
 
-        chosen = Adw.PreferencesGroup(title="City")
-        self.city_row = Adw.ActionRow(title="No city chosen", subtitle="Search below")
+        chosen = Adw.PreferencesGroup(title=_("City"))
+        self.city_row = Adw.ActionRow(title=_("No city chosen"), subtitle=_("Search below"))
         self.city_row.add_prefix(Gtk.Image(icon_name="mark-location-symbolic"))
         chosen.add(self.city_row)
         self.add(chosen)
 
-        search_group = Adw.PreferencesGroup(title="Search")
+        search_group = Adw.PreferencesGroup(title=_("Search"))
         self.entry = Gtk.SearchEntry(
-            placeholder_text="City name", hexpand=True, search_delay=SEARCH_DELAY_MS
+            placeholder_text=_("City name"), hexpand=True, search_delay=SEARCH_DELAY_MS
         )
         self.entry.connect("search-changed", self._on_search_changed)
         search_group.add(self.entry)
@@ -64,15 +66,15 @@ class WeatherPage(Adw.PreferencesPage):
 
     def _show_city(self, city: Location | None) -> None:
         if city is None:
-            self.city_row.set_title("No city chosen")
-            self.city_row.set_subtitle("Search below")
+            self.city_row.set_title(_("No city chosen"))
+            self.city_row.set_subtitle(_("Search below"))
             return
         self.city_row.set_title(city.label)
-        self.city_row.set_subtitle("Loading the forecast…")
+        self.city_row.set_subtitle(_("Loading the forecast…"))
         self._background(
             lambda: self._summary(city),
             self.city_row.set_subtitle,
-            lambda error: self.city_row.set_subtitle("Forecast unavailable"),
+            lambda error: self.city_row.set_subtitle(_("Forecast unavailable")),
         )
 
     def _on_search_changed(self, entry: Gtk.SearchEntry) -> None:
@@ -83,7 +85,7 @@ class WeatherPage(Adw.PreferencesPage):
             self._set_results([])
             self._set_status("")
             return
-        self._set_status("Searching…")
+        self._set_status(_("Searching…"))
         self._background(
             lambda: self._search(query),
             lambda cities: self._on_results(query, cities),
@@ -95,10 +97,10 @@ class WeatherPage(Adw.PreferencesPage):
             return  # an older search finished after a newer one started
         if cities is None:
             self._set_results([])
-            self._set_status("Search unavailable. Check the internet connection.")
+            self._set_status(_("Search unavailable. Check the internet connection."))
         elif not cities:
             self._set_results([])
-            self._set_status(f"No city found for “{query}”")
+            self._set_status(_("No city found for “{query}”").format(query=query))
         else:
             self._set_status("")
             self._set_results(cities)

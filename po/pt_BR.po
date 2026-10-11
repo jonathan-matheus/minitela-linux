@@ -1,0 +1,299 @@
+# Portuguese translations for minitela package.
+# Copyright (C) 2026 Jonathan Matheus
+# This file is distributed under the same license as the minitela package.
+# Automatically generated, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: minitela\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-11 17:09-0300\n"
+"PO-Revision-Date: 2026-10-11 17:09-0300\n"
+"Last-Translator: Automatically generated\n"
+"Language-Team: none\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+#: minitela/ui/app.py:88
+msgid "Open Minitela"
+msgstr "Abrir o Minitela"
+
+#: minitela/ui/app.py:89
+msgid "Next page"
+msgstr "Próxima tela"
+
+#: minitela/ui/app.py:90
+msgid "Quit"
+msgstr "Sair"
+
+#: minitela/ui/autostart.py:69
+msgid "Keep the mini screen updated after the window is closed"
+msgstr "Manter a minitela atualizada depois que a janela for fechada"
+
+#: minitela/ui/gifs.py:30
+msgid "GIFs"
+msgstr "GIFs"
+
+#: minitela/ui/gifs.py:37
+msgid "Factory GIFs"
+msgstr "GIFs de fábrica"
+
+#: minitela/ui/gifs.py:38
+msgid "Sending a GIF rewrites the mini screen's layout and takes about 10 s"
+msgstr "Enviar um GIF regrava o layout da minitela e leva cerca de 10 s"
+
+#: minitela/ui/gifs.py:41
+msgid "Import official package…"
+msgstr "Importar pacote oficial…"
+
+#: minitela/ui/gifs.py:48
+msgid "No GIFs yet. Import the official package (minitela_*.deb) to get the 21 factory GIFs."
+msgstr "Nenhum GIF ainda. Importe o pacote oficial (minitela_*.deb) para obter os 21 GIFs de fábrica."
+
+#: minitela/ui/gifs.py:93
+#, python-brace-format
+msgid "GIF {number}"
+msgstr "GIF {number}"
+
+#: minitela/ui/gifs.py:102
+msgid "Close the other Minitela process to send GIFs from here"
+msgstr "Feche o outro processo do Minitela para enviar GIFs por aqui"
+
+#: minitela/ui/gifs.py:105
+#, python-brace-format
+msgid "Send GIF {number}?"
+msgstr "Enviar o GIF {number}?"
+
+#: minitela/ui/gifs.py:107
+msgid "The mini screen reloads its layout with this GIF. It takes about 10 seconds; do not unplug or suspend the laptop meanwhile."
+msgstr "A minitela recarrega o layout com este GIF. Leva cerca de 10 segundos; não desconecte nem suspenda o notebook enquanto isso."
+
+#: minitela/ui/gifs.py:111
+msgid "Cancel"
+msgstr "Cancelar"
+
+#: minitela/ui/gifs.py:112
+msgid "Send"
+msgstr "Enviar"
+
+#: minitela/ui/gifs.py:122
+#, python-brace-format
+msgid "Sending GIF {number}…"
+msgstr "Enviando o GIF {number}…"
+
+#: minitela/ui/gifs.py:131
+#, python-brace-format
+msgid "GIF {number} sent to the mini screen"
+msgstr "GIF {number} enviado para a minitela"
+
+#: minitela/ui/gifs.py:134
+#, python-brace-format
+msgid "Could not send the GIF: {reason}"
+msgstr "Não foi possível enviar o GIF: {reason}"
+
+#: minitela/ui/gifs.py:149
+msgid "Debian packages"
+msgstr "Pacotes Debian"
+
+#: minitela/ui/gifs.py:153
+msgid "Official Minitela package"
+msgstr "Pacote oficial da Minitela"
+
+#: minitela/ui/gifs.py:175
+#, python-brace-format
+msgid "Imported {count} GIF"
+msgid_plural "Imported {count} GIFs"
+msgstr[0] "{count} GIF importado"
+msgstr[1] "{count} GIFs importados"
+
+#: minitela/ui/gifs.py:182
+#, python-brace-format
+msgid "Could not import: {reason}"
+msgstr "Não foi possível importar: {reason}"
+
+#: minitela/ui/reminder.py:21 minitela/ui/reminder.py:25
+#: minitela/ui/screens.py:19
+msgid "Reminder"
+msgstr "Lembrete"
+
+#: minitela/ui/reminder.py:25
+msgid "Shown on the Reminder page of the mini screen"
+msgstr "Aparece na tela de lembrete da minitela"
+
+#: minitela/ui/reminder.py:44
+msgid "On the mini screen"
+msgstr "Na minitela"
+
+#: minitela/ui/reminder.py:55
+msgid "Clear"
+msgstr "Limpar"
+
+#: minitela/ui/reminder.py:57 minitela/ui/screens.py:66
+msgid "Show now"
+msgstr "Mostrar agora"
+
+#: minitela/ui/reminder.py:59
+msgid "Save"
+msgstr "Salvar"
+
+#: minitela/ui/reminder.py:83
+#, python-brace-format
+msgid "{used}/{limit} bytes: the end will be cut"
+msgstr "{used}/{limit} bytes: o final será cortado"
+
+#: minitela/ui/reminder.py:87
+#, python-brace-format
+msgid "{used}/{limit} bytes"
+msgstr "{used}/{limit} bytes"
+
+#: minitela/ui/screens.py:20
+msgid "Battery and connections"
+msgstr "Bateria e conexões"
+
+#: minitela/ui/screens.py:21 minitela/ui/weather.py:38
+msgid "Weather"
+msgstr "Clima"
+
+#: minitela/ui/screens.py:37
+msgid "Screen"
+msgstr "Tela"
+
+#: minitela/ui/screens.py:45
+msgid "Brightness"
+msgstr "Brilho"
+
+#: minitela/ui/screens.py:52
+msgid "Backlight"
+msgstr "Luz de fundo"
+
+#: minitela/ui/screens.py:58
+msgid "Pages"
+msgstr "Telas"
+
+#: minitela/ui/screens.py:59
+msgid "The pages the mini screen rotates through and the key switches between"
+msgstr "As telas por onde a minitela passa e que a tecla alterna"
+
+#: minitela/ui/screens.py:77
+msgid "Rotation"
+msgstr "Rotação"
+
+#: minitela/ui/screens.py:79
+msgid "Change pages automatically"
+msgstr "Trocar de tela automaticamente"
+
+#: minitela/ui/screens.py:81
+msgid "Seconds on each page"
+msgstr "Segundos em cada tela"
+
+#: minitela/ui/screens.py:91
+msgid "Background"
+msgstr "Segundo plano"
+
+#: minitela/ui/screens.py:92
+msgid "The mini screen keeps updating while the window is closed"
+msgstr "A minitela continua sendo atualizada com a janela fechada"
+
+#: minitela/ui/screens.py:95
+msgid "Start with the session"
+msgstr "Iniciar com a sessão"
+
+#: minitela/ui/screens.py:110
+#, python-brace-format
+msgid "Could not change starting with the session: {reason}"
+msgstr "Não foi possível mudar o início com a sessão: {reason}"
+
+#: minitela/ui/weather.py:22
+#, python-brace-format
+msgid "Today {temperature}"
+msgstr "Hoje {temperature}"
+
+#: minitela/ui/weather.py:45
+msgid "City"
+msgstr "Cidade"
+
+#: minitela/ui/weather.py:46 minitela/ui/weather.py:69
+msgid "No city chosen"
+msgstr "Nenhuma cidade escolhida"
+
+#: minitela/ui/weather.py:46 minitela/ui/weather.py:70
+msgid "Search below"
+msgstr "Pesquise abaixo"
+
+#: minitela/ui/weather.py:51
+msgid "Search"
+msgstr "Pesquisar"
+
+#: minitela/ui/weather.py:53
+msgid "City name"
+msgstr "Nome da cidade"
+
+#: minitela/ui/weather.py:73
+msgid "Loading the forecast…"
+msgstr "Carregando a previsão…"
+
+#: minitela/ui/weather.py:77
+msgid "Forecast unavailable"
+msgstr "Previsão indisponível"
+
+#: minitela/ui/weather.py:88
+msgid "Searching…"
+msgstr "Pesquisando…"
+
+#: minitela/ui/weather.py:100
+msgid "Search unavailable. Check the internet connection."
+msgstr "Pesquisa indisponível. Verifique a conexão com a internet."
+
+#: minitela/ui/weather.py:103
+#, python-brace-format
+msgid "No city found for “{query}”"
+msgstr "Nenhuma cidade encontrada para “{query}”"
+
+#: minitela/ui/window.py:47
+msgid "Quit (stop updating the mini screen)"
+msgstr "Sair (para de atualizar a minitela)"
+
+#: minitela/ui/window.py:68
+#, python-brace-format
+msgid "Could not show the page: {reason}"
+msgstr "Não foi possível mostrar a tela: {reason}"
+
+#: minitela/ui/window.py:77
+msgid "Another Minitela process is driving the mini screen"
+msgstr "Outro processo do Minitela está controlando a minitela"
+
+#: minitela/ui/window.py:79
+msgid "How to fix"
+msgstr "Como resolver"
+
+#: minitela/ui/window.py:79
+msgid "No permission to use the mini screen"
+msgstr "Sem permissão para usar a minitela"
+
+#: minitela/ui/window.py:81
+msgid "Mini screen not found"
+msgstr "Minitela não encontrada"
+
+#: minitela/ui/window.py:83
+#, python-brace-format
+msgid "Mini screen not responding ({reason})"
+msgstr "A minitela não está respondendo ({reason})"
+
+#: minitela/ui/window.py:95
+msgid "Allow access to the mini screen"
+msgstr "Permitir acesso à minitela"
+
+#: minitela/ui/window.py:97
+msgid "Run this once in a terminal. It lets the logged-in user use the mini screen and its keyboard key, and asks for your password."
+msgstr "Rode isto uma vez em um terminal. O comando deixa o usuário conectado usar a minitela e a tecla dela no teclado, e pede a sua senha."
+
+#: minitela/ui/window.py:103
+msgid "Close"
+msgstr "Fechar"
+
+#: minitela/ui/window.py:104
+msgid "Copy command"
+msgstr "Copiar comando"
