@@ -102,12 +102,19 @@ def test_parse_text_value_keeps_padding():
 
 
 def test_parse_write_ack():
-    assert parse_write_ack(response("21 0000 0007 00 0002 00")) == WriteAck((7, 2), ok=True)
+    ack = parse_write_ack(response("21 0000 0007 00 0002 00"))
+    assert ack == WriteAck(0, ((7, 0), (2, 0)))
+    assert ack.registers == (7, 2)
 
 
-@pytest.mark.parametrize("payload_hex", ["20 0100 0007 00", "20 0001 0007 00", "20 0000 0007 01"])
-def test_parse_write_ack_with_status(payload_hex):
-    assert parse_write_ack(response(payload_hex)) == WriteAck((7,), ok=False)
+def test_parse_write_ack_status_follows_its_register():
+    # Real reply to writing the clock date (4) and time (5): only the date has status 0x20.
+    ack = parse_write_ack(response("21 0000 0004 20 0005 00"))
+    assert ack.statuses == ((4, 0x20), (5, 0))
+
+
+def test_parse_write_ack_result():
+    assert parse_write_ack(response("20 0102 0007 00")).result == 0x0102
 
 
 @pytest.mark.parametrize(

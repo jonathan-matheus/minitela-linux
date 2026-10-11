@@ -1,5 +1,6 @@
 """High-level operations on the mini screen, over any Transport."""
 
+import logging
 from collections.abc import Iterable, Mapping
 
 from minitela.protocol import commands, registers, tags
@@ -7,6 +8,8 @@ from minitela.protocol.commands import Command, HandshakeResponse, ProtocolError
 from minitela.protocol.frame import Frame
 from minitela.protocol.tags import Register
 from minitela.transport.base import Transport
+
+log = logging.getLogger(__name__)
 
 PAGE_COUNT = 10  # pages in the factory layout, see docs/registers.md
 
@@ -63,8 +66,10 @@ class Device:
     def _check_ack(self, frame: Frame) -> None:
         ack = registers.parse_write_ack(self._register_request(frame))
         sent = registers.written_registers(frame)
-        if not ack.ok or ack.registers != sent:
+        if ack.registers != sent:
             raise ProtocolError(f"write of registers {sent} not acknowledged: {ack}")
+        if ack.result or any(status for _, status in ack.statuses):
+            log.debug("write acknowledged with status: %s", ack)
 
     def _register_request(self, frame: Frame) -> Frame:
         return self.transport.request(

@@ -88,18 +88,18 @@ def test_write_numbers_in_several_frames(device, screen, transport):
     assert screen.numbers == {i: i for i in range(1, 21)}
 
 
-def ack_for(registers: bytes, status: int = 0) -> Frame:
-    return Frame(Command.SET_REGISTER.response, bytes([0x20, status, 0]) + registers + b"\0")
+def ack_for(register: bytes, status: int = 0) -> Frame:
+    return Frame(Command.SET_REGISTER.response, b"\x20\0\0" + register + bytes([status]))
 
 
-@pytest.mark.parametrize(
-    "reply",
-    [
-        ack_for(b"\x00\x07", status=1),  # non-zero status
-        ack_for(b"\x00\x02"),  # acknowledges another register
-    ],
-)
-def test_write_not_acknowledged(reply):
-    device = Device(FakeTransport(lambda frame: [reply]), timeout=0.05)
+def test_write_acknowledged_with_status(caplog):
+    caplog.set_level("DEBUG")
+    device = Device(FakeTransport(lambda frame: [ack_for(b"\x00\x07", 0x20)]), timeout=0.05)
+    device.set_brightness(50)
+    assert "status" in caplog.text
+
+
+def test_write_of_another_register_acknowledged():
+    device = Device(FakeTransport(lambda frame: [ack_for(b"\x00\x02")]), timeout=0.05)
     with pytest.raises(ProtocolError):
         device.set_brightness(50)

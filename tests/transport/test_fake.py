@@ -100,7 +100,7 @@ def test_simulated_handshake(transport):
 def test_simulated_number_registers(transport, screen):
     (write,) = write_numbers([(7, 50), (2, 3)])
     reply = transport.request(write, Command.SET_REGISTER.response)
-    assert parse_write_ack(reply) == WriteAck((7, 2), ok=True)
+    assert parse_write_ack(reply) == WriteAck(0, ((7, 0), (2, 0)))
     assert screen.numbers == {7: 50, 2: 3}
 
     (read,) = read_numbers([2, 99])
@@ -110,7 +110,7 @@ def test_simulated_number_registers(transport, screen):
 
 def test_simulated_text_registers(transport, screen):
     reply = transport.request(write_string(1082, "80%"), Command.SET_REGISTER.response)
-    assert parse_write_ack(reply) == WriteAck((1082,), ok=True)
+    assert parse_write_ack(reply) == WriteAck(0, ((1082, 0),))
     assert screen.texts == {1082: b"80%"}
 
     reply = transport.request(read_string(1082, 6), Command.SET_REGISTER.response)

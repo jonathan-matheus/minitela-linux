@@ -90,12 +90,17 @@ def read_string(register: int, length: int) -> Frame:
 class WriteAck:
     """The device's acknowledgement of a register write.
 
-    It carries the written register IDs plus status bytes that were always zero, even for
-    registers that do not exist, so `ok` only flags an unexpected non-zero status.
+    `result` (two bytes) has always been zero. Each written register comes back with a status
+    byte whose meaning is unknown: writing the clock date register (4) answers 0x20 although
+    the value is stored; every other write so far answered 0.
     """
 
-    registers: tuple[int, ...]
-    ok: bool
+    result: int
+    statuses: tuple[tuple[int, int], ...]  # (register, status), in the order written
+
+    @property
+    def registers(self) -> tuple[int, ...]:
+        return tuple(register for register, _ in self.statuses)
 
 
 def _check_reply(frame: Frame) -> tuple[int, int, bytes]:
@@ -131,16 +136,12 @@ def parse_register_values(frame: Frame) -> dict[int, int | bytes]:
 
 
 def parse_write_ack(frame: Frame) -> WriteAck:
-    """Acknowledgement of a register write: two status bytes, then ID and status per register.
-
-    Seen on the device as `00 00 | id 00 | id 00 ...`. The exact split of the status bytes
-    is unknown (they were always zero), but the IDs always sit at offset 2 + 3 * n.
-    """
+    """Acknowledgement of a register write: `result (u16)`, then `id (u16) status (u8)` each."""
     function, count, data = _check_reply(frame)
     if function != _REPLY_WRITE:
         raise ProtocolError(f"not a register write reply (function {function})")
     if len(data) < 2 + count * 3:
         raise _too_short(frame)
-    registers = tuple(int.from_bytes(data[2 + i * 3 : 4 + i * 3]) for i in range(count))
-    statuses = [data[0], data[1], *(data[4 + i * 3] for i in range(count))]
-    return WriteAck(registers, ok=not any(statuses))
+    entries = (data[2 + i * 3 : 5 + i * 3] for i in range(count))
+    statuses = tuple((int.from_bytes(e[:2]), e[2]) for e in entries)
+    return WriteAck(int.from_bytes(data[:2]), statuses)

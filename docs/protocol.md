@@ -181,7 +181,7 @@ espera outros códigos de função, provavelmente de outro firmware.
 |---|---|---|
 | Ler números | `0x00 \| (n - 1)` (função 0) | repetido `n` vezes: `id (u16)` `valor (u32)` |
 | Ler string | `0x10` (função 1) | `id (u16)` `tamanho (u16)` `bytes`, completados com `00` até o tamanho pedido |
-| Escrever (números ou string) | `0x20 \| (n - 1)` (função 2) | `00 00`, depois repetido `n` vezes: `id (u16)` `00` |
+| Escrever (números ou string) | `0x20 \| (n - 1)` (função 2) | `resultado (u16)`, depois repetido `n` vezes: `id (u16)` `status (u8)` |
 
 Exemplo, confirmação da escrita do brilho e da página:
 
@@ -189,9 +189,11 @@ Exemplo, confirmação da escrita do brilho e da página:
 41 48 | 80 0b | 00 d0 | 21 00 00 00 07 00 00 02 00 | 00 00 | 4d 49
 ```
 
-Os bytes `00` da confirmação são de status. Eles vieram zerados até para registradores que não
-existem (9999), então o dispositivo não valida os ids e a posição exata de cada status não pode
-ser deduzida. Ler um registrador de string inexistente devolve bytes arbitrários.
+O `resultado` sempre veio `00 00`. O `status` de cada registrador é quase sempre `00`, até
+para registradores que não existem (9999): o dispositivo não valida os ids. A exceção é o
+registrador 4 (data do relógio interno), que responde `20` mesmo gravando o valor. O
+significado do status é desconhecido, então ele não é tratado como erro. Ler um registrador de
+string inexistente devolve bytes arbitrários.
 
 ## Comportamento dos apps oficiais
 

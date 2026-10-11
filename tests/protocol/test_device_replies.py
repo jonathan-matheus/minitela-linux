@@ -39,9 +39,9 @@ def test_parsed_replies():
     software = parse_register_values(replies[2])[10]
     assert software.rstrip(b"\0") == b"1.10.19_build_2024.09.20_GIFTest"
     assert parse_register_values(replies[4]) == {2: 1, 7: 75}
-    assert parse_write_ack(replies[5]) == WriteAck((7,), ok=True)
-    assert parse_write_ack(replies[6]) == WriteAck((7, 2), ok=True)
-    assert parse_write_ack(replies[7]) == WriteAck((1082,), ok=True)
+    assert parse_write_ack(replies[5]) == WriteAck(0, ((7, 0),))
+    assert parse_write_ack(replies[6]) == WriteAck(0, ((7, 0), (2, 0)))
+    assert parse_write_ack(replies[7]) == WriteAck(0, ((1082, 0),))
     assert parse_register_values(replies[8])[1082].rstrip(b"\0") == b"100%"
 
 
