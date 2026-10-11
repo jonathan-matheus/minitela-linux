@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from minitela.dbus import Bus
-from minitela.device import Device
+from minitela.device import PAGE_COUNT, Device
 from minitela.protocol import tags
 from minitela.protocol.commands import ProtocolError
 from minitela.settings import Settings, load_settings
@@ -77,6 +77,11 @@ class Scheduler:
             device.write_values(changed)
             self._sent |= changed
         return changed
+
+    @property
+    def sent(self) -> Values:
+        """The last value sent for each register."""
+        return dict(self._sent)
 
     def seconds_until_due(self) -> float:
         if len(self._due) < len(self.sources):
@@ -214,6 +219,29 @@ class Service:
                 self.scheduler.send(self._device, brightness)
             except (TransportError, ResponseTimeout, ProtocolError) as error:
                 log.warning("could not change the brightness: %s", error)
+
+    def handle_command(self, command: str) -> str:
+        """Run a control command ("next-page" or "page N"); returns the reply."""
+        name, _, argument = command.partition(" ")
+        with self._lock:
+            if self._device is None or not self.connection.is_open:
+                return "error: mini screen not connected"
+            if name == "next-page":
+                page = self._next_page()
+            elif name == "page" and argument.isdigit() and 1 <= int(argument) <= PAGE_COUNT:
+                page = int(argument)
+            else:
+                return f"error: unknown command {command!r}"
+            self.scheduler.send(self._device, {tags.PAGE: page})
+            log.info("page = %d (%s)", page, name)
+            return f"ok {page}"
+
+    def _next_page(self) -> int:
+        pages = self.settings.pages
+        current = self.scheduler.sent.get(tags.PAGE)
+        if current not in pages:
+            return pages[0]
+        return pages[(pages.index(current) + 1) % len(pages)]
 
     def _overrides(self) -> Values:
         return {tags.BRIGHTNESS: 0} if self.blanked else {}

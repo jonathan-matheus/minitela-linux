@@ -9,7 +9,7 @@ from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
-from minitela import __version__, hyprland
+from minitela import __version__, control, hyprland
 from minitela.assets import InvalidPackageError, import_deb, library_dir, load_library
 from minitela.dbus import BusError
 from minitela.device import PAGE_COUNT, Device
@@ -65,7 +65,27 @@ def _connected(args: argparse.Namespace) -> Device:
     return device
 
 
+def _service_running() -> bool:
+    try:
+        return control.send_command("ping") == "ok"
+    except control.ServiceNotRunning:
+        return False
+
+
+def _ask_service(command: str) -> int:
+    reply = control.send_command(command)
+    if reply.startswith("error"):
+        return _fail(f"the service answered: {reply}")
+    return 0
+
+
 def _brightness(args: argparse.Namespace) -> int:
+    if _service_running():
+        # The running service owns the port; it applies settings changes within a second.
+        settings = load_settings()
+        settings.brightness = args.percent
+        save_settings(settings)
+        return 0
     device = _connected(args)
     with device.transport:
         device.set_brightness(args.percent)
@@ -73,9 +93,24 @@ def _brightness(args: argparse.Namespace) -> int:
 
 
 def _page(args: argparse.Namespace) -> int:
+    if _service_running():
+        return _ask_service(f"page {args.page}")
     device = _connected(args)
     with device.transport:
         device.show_page(args.page)
+    return 0
+
+
+def _next_page(args: argparse.Namespace) -> int:
+    """Show the next of the pages in the settings: what the mini screen key does."""
+    if _service_running():
+        return _ask_service("next-page")
+    pages = load_settings().pages
+    device = _connected(args)
+    with device.transport:
+        current = device.read_numbers([tags.PAGE.id])[tags.PAGE.id]
+        following = pages[(pages.index(current) + 1) % len(pages)] if current in pages else pages[0]
+        device.show_page(following)
     return 0
 
 
@@ -393,6 +428,14 @@ def _run(args: argparse.Namespace) -> int:
             "cannot follow Hyprland's lock",
         ),
     ]
+    server = control.ControlServer(service.handle_command)
+    try:
+        server.start()
+    except OSError as error:
+        for running in (monitor, *system_monitors):
+            if running is not None:
+                running.stop()
+        return _fail(str(error))
     signal.signal(signal.SIGTERM, lambda signum, frame: service.stop())
     log.info("running; press Ctrl+C to stop")
     try:
@@ -400,6 +443,7 @@ def _run(args: argparse.Namespace) -> int:
     except KeyboardInterrupt:
         pass
     finally:
+        server.stop()
         for running in (monitor, *system_monitors):
             if running is not None:
                 running.stop()
@@ -438,6 +482,10 @@ def build_parser() -> argparse.ArgumentParser:
     page = subcommands.add_parser("page", help="show a page (number or name)")
     page.add_argument("page", type=_page_number)
     page.set_defaults(handler=_page)
+    next_page = subcommands.add_parser(
+        "next-page", help="show the next page of the rotation list (bind it to the mini screen key)"
+    )
+    next_page.set_defaults(handler=_next_page)
     clock = subcommands.add_parser("sync-clock", help="set the date and time to now")
     clock.set_defaults(handler=_sync_clock)
     list_tags = subcommands.add_parser("tags", help="list the known registers")

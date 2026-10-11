@@ -405,3 +405,48 @@ def test_blank_write_failure_is_logged(clock, screen, tmp_path, caplog, monkeypa
     monkeypatch.setattr(service.connection.get_transport(), "_write", unplugged)
     service.set_blanked("lock", True)
     assert "could not change the brightness" in caplog.text
+
+
+# --- Control commands ----------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("pages", "start", "expected"),
+    [([1, 2, 3], 1, [2, 3, 1]), ([4, 5], 9, [4, 5, 4])],
+)
+def test_next_page(clock, screen, tmp_path, pages, start, expected):
+    path = tmp_path / "settings.json"
+    save_settings(Settings(pages=pages), path)
+    run = Run(clock, steps=1)
+    service = make_service(
+        clock, lambda: FakeTransport(screen), path, lambda s: [FakeSource({tags.PAGE: start})], run
+    )
+    service.run()
+    service.connection.get_transport()  # reconnecting forgets what was sent...
+    service._step()  # ...so the sources' page is sent again
+    shown = []
+    for _ in expected:
+        assert service.handle_command("next-page").startswith("ok")
+        shown.append(screen.numbers[2])
+    assert shown == expected
+
+
+def test_page_command(clock, screen, tmp_path):
+    service = connected_service(clock, screen, tmp_path)
+    assert service.handle_command("page 4") == "ok 4"
+    assert screen.numbers[2] == 4
+    assert service.handle_command("page 11").startswith("error")
+    assert service.handle_command("page x").startswith("error")
+    assert service.handle_command("reboot").startswith("error")
+
+
+def test_commands_need_the_screen(clock, tmp_path):
+    run = Run(clock, steps=1)
+    service = make_service(
+        clock,
+        lambda: (_ for _ in ()).throw(DeviceNotFoundError("no")),
+        tmp_path / "s.json",
+        [],
+        run,
+    )
+    assert service.handle_command("next-page") == "error: mini screen not connected"

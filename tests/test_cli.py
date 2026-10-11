@@ -6,7 +6,7 @@ from dataclasses import asdict
 import pytest
 import serial
 
-from minitela import __version__, cli, hyprland
+from minitela import __version__, cli, control, hyprland
 from minitela.device import Device
 from minitela.transport import connection
 from minitela.transport.discovery import SerialDevice
@@ -17,6 +17,15 @@ MINITELA = SerialDevice("/dev/ttyACM0", "0324", "0324", "sxw-admin_CDC_DEMO")
 REAL_SLEEP_MONITOR = cli._sleep_monitor
 REAL_LOCK_MONITOR = cli._lock_monitor
 REAL_HYPRLAND_MONITOR = cli._hyprland_lock_monitor
+
+
+@pytest.fixture(autouse=True)
+def runtime_dir(monkeypatch, tmp_path):
+    """A private XDG_RUNTIME_DIR, so tests never reach a real service's control socket."""
+    path = tmp_path / "runtime"
+    path.mkdir()
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(path))
+    return path
 
 
 @pytest.fixture(autouse=True)
@@ -522,6 +531,9 @@ class FakeService:
     def set_blanked(self, reason, blanked):
         self.blanked.append((reason, blanked))
 
+    def handle_command(self, command):
+        return "ok"
+
     def run(self):
         raise KeyboardInterrupt
 
@@ -673,3 +685,52 @@ def test_system_bus():
     from minitela.dbus_gio import GioBus
 
     assert isinstance(cli._system_bus(), GioBus)
+
+
+# --- Control socket ------------------------------------------------------------------------
+
+
+@pytest.fixture
+def running_service():
+    """A control server answering like the service would; records the commands it got."""
+    commands = []
+
+    def handle(command):
+        commands.append(command)
+        return "error: busy" if command == "page 9" else "ok 3"
+
+    server = control.ControlServer(handle)
+    server.start()
+    yield commands
+    server.stop()
+
+
+def test_page_through_the_service(running_service, plugged):
+    assert cli.main(["page", "4"]) == 0
+    assert cli.main(["next-page"]) == 0
+    assert running_service == ["page 4", "next-page"]
+    assert plugged == []  # the port was left to the service
+
+
+def test_service_error_is_reported(running_service, plugged, capsys):
+    assert cli.main(["page", "9"]) == 1
+    assert "the service answered: error: busy" in capsys.readouterr().err
+
+
+def test_brightness_while_the_service_runs(running_service, plugged, config_home):
+    assert cli.main(["brightness", "35"]) == 0
+    assert cli.load_settings().brightness == 35
+    assert plugged == []
+
+
+@pytest.mark.parametrize(("current", "following"), [(3, 4), (5, 1), (9, 1)])
+def test_next_page_without_the_service(plugged, screen, config_home, current, following):
+    screen.numbers[2] = current
+    assert cli.main(["next-page"]) == 0
+    assert screen.numbers[2] == following
+
+
+def test_run_refuses_a_second_service(monkeypatch, services, monitors, running_service, capsys):
+    monkeypatch.setattr(cli, "_system_bus", lambda: None)
+    assert cli.main(["run"]) == 1
+    assert "another minitela service is running" in capsys.readouterr().err
