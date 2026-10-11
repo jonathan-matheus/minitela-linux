@@ -7,8 +7,8 @@ from minitela.ui.window import MainWindow
 
 
 @pytest.fixture
-def window(adw_app):
-    return MainWindow(adw_app)
+def window(adw_app, store, commands):
+    return MainWindow(adw_app, store, commands)
 
 
 @pytest.mark.parametrize(
@@ -54,3 +54,16 @@ def test_banner_button_opens_the_dialog(window, monkeypatch):
     monkeypatch.setattr(window, "show_setup_dialog", lambda: opened.append(True))
     window.banner.emit("button-clicked")
     assert opened == [True]
+
+
+def test_show_page(window, commands):
+    window.show_page(4)
+    assert commands.sent == ["page 4"]
+
+
+def test_show_page_failure_is_reported(window, commands, monkeypatch):
+    toasts = []
+    monkeypatch.setattr(window.toasts, "add_toast", lambda toast: toasts.append(toast.get_title()))
+    commands.reply = "error: mini screen not connected"
+    window.show_page(4)
+    assert toasts == ["Could not show the page: error: mini screen not connected"]

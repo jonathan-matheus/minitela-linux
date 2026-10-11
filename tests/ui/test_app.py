@@ -56,8 +56,8 @@ def make_app(runner):
     return app
 
 
-def test_window(adw_app):
-    window = MainWindow(adw_app)
+def test_window(adw_app, store, commands):
+    window = MainWindow(adw_app, store, commands)
     assert window.get_title() == "Minitela"
 
 
@@ -159,4 +159,26 @@ def test_window_without_own_service():
     app.register(None)
     app.activate()
     assert "Another Minitela process" in app.get_windows()[0].banner.get_title()
+    app.do_shutdown()
+
+
+def test_commands_go_to_our_service():
+    runner = FakeRunner()
+    runner.service.handle_command = lambda command: f"ok handled {command}"
+    app = make_app(runner)
+    app.register(None)
+    assert app.command("page 2") == "ok handled page 2"
+    app.do_shutdown()
+
+
+def test_commands_go_to_the_other_process():
+    from minitela import control
+
+    server = control.ControlServer(lambda command: f"ok remote {command}")
+    server.start()
+    app = make_app(FakeRunner(refuse=True))
+    app.register(None)
+    assert app.command("next-page") == "ok remote next-page"
+    server.stop()
+    assert app.command("next-page") == "error: no Minitela service is running"
     app.do_shutdown()

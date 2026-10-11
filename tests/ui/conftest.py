@@ -14,6 +14,38 @@ Adw.init()
 
 
 @pytest.fixture(autouse=True)
+def private_dirs(monkeypatch, tmp_path):
+    """Never touch the developer's settings or a running service's control socket."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path / "runtime"))
+
+
+@pytest.fixture
+def store():
+    from minitela.ui.store import SettingsStore
+
+    return SettingsStore()
+
+
+class Commands:
+    """Records the control commands the UI sends; answers "ok" unless told otherwise."""
+
+    def __init__(self):
+        self.sent = []
+        self.reply = "ok"
+
+    def __call__(self, command):
+        self.sent.append(command)
+        return self.reply
+
+
+@pytest.fixture
+def commands():
+    return Commands()
+
+
+@pytest.fixture(autouse=True)
 def no_windows_on_screen(monkeypatch):
     """Build windows without showing them on the developer's screen."""
     monkeypatch.setattr(Gtk.Window, "present", lambda self: None)

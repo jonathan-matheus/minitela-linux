@@ -1,5 +1,7 @@
 """Main window."""
 
+from collections.abc import Callable
+
 import gi
 
 gi.require_version("Gtk", "4.0")
@@ -7,26 +9,44 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gtk  # noqa: E402
 
 from minitela.service import State, Status  # noqa: E402
+from minitela.ui.screens import ScreensPage  # noqa: E402
 from minitela.ui.setup import host_setup_command  # noqa: E402
+from minitela.ui.store import SettingsStore  # noqa: E402
 
 
 class MainWindow(Adw.ApplicationWindow):
-    def __init__(self, application: Adw.Application):
+    def __init__(
+        self,
+        application: Adw.Application,
+        store: SettingsStore,
+        command: Callable[[str], str],
+    ):
         super().__init__(application=application, title="Minitela")
-        self.set_default_size(440, 680)
-        self.header = Adw.HeaderBar()
+        self.set_default_size(460, 720)
+        self.store = store
+        self._command = command
+        self.stack = Adw.ViewStack()
+        self.screens = ScreensPage(store, self.show_page)
+        self.stack.add_titled_with_icon(
+            self.screens, "screen", self.screens.get_title(), self.screens.get_icon_name()
+        )
+        self.header = Adw.HeaderBar(
+            title_widget=Adw.ViewSwitcher(stack=self.stack, policy=Adw.ViewSwitcherPolicy.WIDE)
+        )
         self.banner = Adw.Banner()
         self.banner.connect("button-clicked", lambda banner: self.show_setup_dialog())
-        self.content = Adw.StatusPage(
-            icon_name="dev.pragmatico.Minitela",
-            title="Minitela",
-            description="Settings for the Positivo Vision mini screen",
-        )
+        self.toasts = Adw.ToastOverlay(child=self.stack)
         toolbar = Adw.ToolbarView()
         toolbar.add_top_bar(self.header)
         toolbar.add_top_bar(self.banner)
-        toolbar.set_content(self.content)
+        toolbar.set_content(self.toasts)
         self.set_content(toolbar)
+
+    def show_page(self, page: int) -> None:
+        """Ask the service to show `page` now."""
+        reply = self._command(f"page {page}")
+        if not reply.startswith("ok"):
+            self.toasts.add_toast(Adw.Toast(title=f"Could not show the page: {reply}"))
 
     def show_state(self, state: State | None) -> None:
         """Explain on a banner why the screen is not being updated; None: another process

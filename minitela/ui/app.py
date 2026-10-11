@@ -13,8 +13,10 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
+from minitela import control  # noqa: E402
 from minitela.runner import Runner  # noqa: E402
 from minitela.service import State  # noqa: E402
+from minitela.ui.store import SettingsStore  # noqa: E402
 from minitela.ui.window import MainWindow  # noqa: E402
 
 log = logging.getLogger(__name__)
@@ -65,9 +67,18 @@ class MinitelaApp(Adw.Application):
     def do_activate(self) -> None:
         window = self.props.active_window
         if window is None:
-            window = MainWindow(self)
+            window = MainWindow(self, SettingsStore(), self.command)
             window.show_state(self.state)
         window.present()
+
+    def command(self, command: str) -> str:
+        """Run a control command on our service, or on the process that drives the screen."""
+        if self.runner is not None:
+            return self.runner.service.handle_command(command)
+        try:
+            return control.send_command(command)
+        except control.ServiceNotRunning:
+            return "error: no Minitela service is running"
 
     def _show_state(self, state: State) -> bool:
         """Runs on the main thread (scheduled from the service's thread)."""

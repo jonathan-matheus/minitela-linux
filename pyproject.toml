@@ -40,7 +40,7 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --import-mode=importlib"
-pythonpath = ["tests"]
+pythonpath = ["tests", "tests/ui"]
 filterwarnings = [
     # Deprecations inside PyGObject itself, and the API the fake logind uses in tests.
     "ignore::DeprecationWarning:gi.events",
