@@ -121,3 +121,15 @@ def test_sync_clock(device, screen):
     device.sync_clock(datetime(2026, 10, 11, 14, 5, 9))
     assert screen.texts == {2006: b"11/10 14:05"}
     assert screen.numbers == {4: 0x20261011, 5: 0x140509}
+
+
+def test_set_and_get_number_tag(device, screen):
+    device.set_tag(tags.BATTERY_ICON, 2)
+    assert screen.numbers == {1150: 2}
+    assert device.get_tag(tags.BATTERY_ICON) == 2
+
+
+def test_set_and_get_text_tag(device, screen):
+    device.set_tag(tags.WIFI_NAME, "rede-casa")
+    assert screen.texts == {1083: b"rede-casa"}
+    assert device.get_tag(tags.WIFI_NAME) == "rede-casa"

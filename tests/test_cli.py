@@ -167,3 +167,33 @@ def test_sync_clock(plugged, screen, capsys):
     shown = screen.texts[2006].decode()
     assert f"Clock set to {shown}" in capsys.readouterr().out
     assert screen.numbers[4] >> 16 >= 0x2026
+
+
+def test_list_tags(capsys):
+    assert cli.main(["tags"]) == 0
+    out = capsys.readouterr().out
+    assert " 1082  battery_percent          text 32" in out
+    assert "    7  brightness               number" in out
+
+
+def test_set_and_get_tags(plugged, screen, capsys):
+    assert cli.main(["set-tag", "battery_percent", "42%"]) == 0
+    assert cli.main(["set-tag", "battery_icon", "1"]) == 0
+    assert screen.texts[1082] == b"42%"
+    assert screen.numbers[1150] == 1
+    assert cli.main(["get-tag", "battery_percent"]) == 0
+    assert cli.main(["get-tag", "battery_icon"]) == 0
+    assert capsys.readouterr().out.split() == ["42%", "1"]
+
+
+def test_set_number_tag_with_text(plugged, capsys):
+    assert cli.main(["set-tag", "battery_icon", "full"]) == 1
+    assert "number register" in capsys.readouterr().err
+    assert plugged == []
+
+
+def test_unknown_tag(plugged, capsys):
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["get-tag", "nope"])
+    assert exc.value.code == 2
+    assert "minitela tags" in capsys.readouterr().err

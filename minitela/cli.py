@@ -76,6 +76,38 @@ def _sync_clock(args: argparse.Namespace) -> int:
     return 0
 
 
+def _tag(name: str) -> tags.Register:
+    try:
+        return tags.REGISTERS[name]
+    except KeyError:
+        raise argparse.ArgumentTypeError(
+            f"unknown tag {name!r} (run 'minitela tags' to list them)"
+        ) from None
+
+
+def _list_tags(args: argparse.Namespace) -> int:
+    for register in sorted(tags.REGISTERS.values(), key=lambda r: r.id):
+        kind = f"text {register.max_length}" if register.kind is tags.Kind.TEXT else "number"
+        print(f"{register.id:5d}  {register.name:24s} {kind}")
+    return 0
+
+
+def _get_tag(args: argparse.Namespace) -> int:
+    device = _connected(args)
+    with device.transport:
+        print(device.get_tag(args.tag))
+    return 0
+
+
+def _set_tag(args: argparse.Namespace) -> int:
+    if args.tag.kind is tags.Kind.NUMBER and not args.value.isdigit():
+        return _fail(f"{args.tag.name} is a number register, got {args.value!r}")
+    device = _connected(args)
+    with device.transport:
+        device.set_tag(args.tag, args.value)
+    return 0
+
+
 def _page_number(value: str) -> int:
     """A page number or name (whatsapp, reminder, system_info, weather, gif1...)."""
     names = ", ".join(page.name.lower() for page in tags.Page)
@@ -111,6 +143,15 @@ def build_parser() -> argparse.ArgumentParser:
     page.set_defaults(handler=_page)
     clock = subcommands.add_parser("sync-clock", help="set the date and time to now")
     clock.set_defaults(handler=_sync_clock)
+    list_tags = subcommands.add_parser("tags", help="list the known registers")
+    list_tags.set_defaults(handler=_list_tags)
+    get_tag = subcommands.add_parser("get-tag", help="read a register")
+    get_tag.add_argument("tag", type=_tag)
+    get_tag.set_defaults(handler=_get_tag)
+    set_tag = subcommands.add_parser("set-tag", help="write a register")
+    set_tag.add_argument("tag", type=_tag)
+    set_tag.add_argument("value")
+    set_tag.set_defaults(handler=_set_tag)
     return parser
 
 

@@ -7,7 +7,7 @@ from datetime import datetime
 from minitela.protocol import commands, registers, tags
 from minitela.protocol.commands import Command, HandshakeResponse, ProtocolError
 from minitela.protocol.frame import Frame
-from minitela.protocol.tags import Register
+from minitela.protocol.tags import Kind, Register
 from minitela.transport.base import Transport
 
 log = logging.getLogger(__name__)
@@ -67,6 +67,18 @@ class Device:
     def write_text(self, register: Register, text: str) -> None:
         """Set a text register, cut to its maximum length."""
         self._check_ack(registers.write_string(register.id, text, register.max_length))
+
+    def set_tag(self, register: Register, value: int | str) -> None:
+        """Write a register of either kind."""
+        if register.kind is Kind.TEXT:
+            self.write_text(register, str(value))
+        else:
+            self.write_numbers({register.id: int(value)})
+
+    def get_tag(self, register: Register) -> int | str:
+        if register.kind is Kind.TEXT:
+            return self.read_text(register)
+        return self.read_numbers([register.id])[register.id]
 
     def sync_clock(self, moment: datetime) -> None:
         """Show `moment` as the date and time, and set the device's internal clock to it."""
