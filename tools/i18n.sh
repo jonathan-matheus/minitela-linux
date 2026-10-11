@@ -1,8 +1,9 @@
 #!/bin/sh
 # Translation upkeep. Needs gettext.
-#   tools/i18n.sh update    extract the strings into po/minitela.pot and merge them into po/*.po
+#   tools/i18n.sh update    extract the strings (interface, .desktop and metainfo) into
+#                           po/minitela.pot and merge them into po/*.po
 #   tools/i18n.sh compile   compile po/*.po into minitela/locale/ to try them without reinstalling
-#   tools/i18n.sh add LANG  start a translation, e.g. tools/i18n.sh add es
+#   tools/i18n.sh add LANG  start a translation, e.g. tools/i18n.sh add es (then list it in po/LINGUAS)
 #   tools/i18n.sh extract FILE  only extract the strings into FILE (used by the tests)
 set -eu
 cd "$(dirname "$0")/.."
@@ -10,6 +11,9 @@ cd "$(dirname "$0")/.."
 extract() {
     xgettext --language=Python --from-code=UTF-8 --add-comments=Translators: \
         --package-name=minitela --sort-by-file --output="$1" minitela/i18n.py minitela/ui/*.py
+    # .desktop and metainfo: xgettext knows their formats (the latter through ITS rules).
+    xgettext --join-existing --sort-by-file --output="$1" \
+        data/dev.pragmatico.Minitela.desktop data/dev.pragmatico.Minitela.metainfo.xml
 }
 
 case "${1:-}" in
@@ -33,7 +37,7 @@ add)
     msginit --no-translator --locale="$2" --input=po/minitela.pot --output-file="po/$2.po"
     ;;
 *)
-    sed -n '2,6p' "$0" >&2
+    sed -n '2,7p' "$0" >&2
     exit 2
     ;;
 esac

@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 Jonathan Matheus -->
+<component type="desktop-application">
+  <id>dev.pragmatico.Minitela</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+
+  <name translate="no">Minitela</name>
+  <summary>Control the mini screen of the Positivo Vision laptop</summary>
+  <developer id="dev.pragmatico">
+    <name translate="no">Jonathan Matheus</name>
+  </developer>
+
+  <description>
+    <p>
+      Shows the time, weather, battery, connections, a reminder and WhatsApp messages on the
+      small screen next to the keyboard of the Positivo Vision R15M, and lets you choose its
+      GIF. An independent, open source replacement for the official app that works on any
+      distribution.
+    </p>
+    <ul>
+      <li>Weather forecast for the chosen city, without an API key</li>
+      <li>Battery, Wi-Fi and Bluetooth status</li>
+      <li>Brightness and automatic page rotation</li>
+      <li>The laptop's mini screen key switches pages</li>
+      <li>The mini screen turns off when the laptop suspends or the session is locked</li>
+      <li>Factory GIFs, imported from the official package</li>
+    </ul>
+    <p>
+      The mini screen needs a one-time setup on the host system, which the app explains. It
+      gives the logged-in user access to the device and nothing else.
+    </p>
+    <p>Not affiliated with Positivo Tecnologia or PoliCorp Tecnologia.</p>
+  </description>
+
+  <launchable type="desktop-id">dev.pragmatico.Minitela.desktop</launchable>
+  <translation type="gettext">minitela</translation>
+  <url type="homepage">https://pragmatico.dev/</url>
+
+  <provides>
+    <binary>minitela</binary>
+    <binary>minitela-app</binary>
+    <!-- The mini screen's USB serial device, so software centers can suggest the app. -->
+    <modalias>usb:v0324p0324d*</modalias>
+  </provides>
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </supports>
+
+  <content_rating type="oars-1.1"/>
+
+  <releases>
+    <release version="0.1.0" date="2026-10-11" type="development">
+      <description>
+        <p>First preview.</p>
+      </description>
+    </release>
+  </releases>
+</component>

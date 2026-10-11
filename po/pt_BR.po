@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: minitela\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-11 17:09-0300\n"
+"POT-Creation-Date: 2026-10-11 17:22-0300\n"
 "PO-Revision-Date: 2026-10-11 17:09-0300\n"
 "Last-Translator: Automatically generated\n"
 "Language-Team: none\n"
@@ -16,6 +16,66 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+#: data/dev.pragmatico.Minitela.desktop:3
+msgid "Minitela"
+msgstr "Minitela"
+
+#: data/dev.pragmatico.Minitela.desktop:4
+msgid "Mini screen settings"
+msgstr "Configurações da minitela"
+
+#: data/dev.pragmatico.Minitela.desktop:5
+msgid "Show the time, weather, battery and messages on the Positivo Vision mini screen"
+msgstr "Mostra a hora, o clima, a bateria e mensagens na minitela do Positivo Vision"
+
+#: data/dev.pragmatico.Minitela.desktop:10
+msgid "Positivo;Vision;mini screen;minitela;"
+msgstr "Positivo;Vision;minitela;tela;"
+
+#: data/dev.pragmatico.Minitela.metainfo.xml:9
+msgid "Control the mini screen of the Positivo Vision laptop"
+msgstr "Controle a minitela do notebook Positivo Vision"
+
+#: data/dev.pragmatico.Minitela.metainfo.xml:15
+msgid "Shows the time, weather, battery, connections, a reminder and WhatsApp messages on the small screen next to the keyboard of the Positivo Vision R15M, and lets you choose its GIF. An independent, open source replacement for the official app that works on any distribution."
+msgstr "Mostra a hora, o clima, a bateria, as conexões, um lembrete e mensagens do WhatsApp na pequena tela ao lado do teclado do Positivo Vision R15M, e permite escolher o GIF dela. Um substituto independente e de código aberto para o app oficial, que funciona em qualquer distribuição."
+
+#: data/dev.pragmatico.Minitela.metainfo.xml:22
+msgid "Weather forecast for the chosen city, without an API key"
+msgstr "Previsão do tempo da cidade escolhida, sem chave de API"
+
+#: data/dev.pragmatico.Minitela.metainfo.xml:23
+msgid "Battery, Wi-Fi and Bluetooth status"
+msgstr "Estado da bateria, do Wi-Fi e do Bluetooth"
+
+#: data/dev.pragmatico.Minitela.metainfo.xml:24
+msgid "Brightness and automatic page rotation"
+msgstr "Brilho e troca automática de telas"
+
+#: data/dev.pragmatico.Minitela.metainfo.xml:25
+msgid "The laptop's mini screen key switches pages"
+msgstr "A tecla da minitela no notebook troca de tela"
+
+#: data/dev.pragmatico.Minitela.metainfo.xml:26
+msgid "The mini screen turns off when the laptop suspends or the session is locked"
+msgstr "A minitela apaga quando o notebook suspende ou a sessão é bloqueada"
+
+#: data/dev.pragmatico.Minitela.metainfo.xml:27
+msgid "Factory GIFs, imported from the official package"
+msgstr "GIFs de fábrica, importados do pacote oficial"
+
+#: data/dev.pragmatico.Minitela.metainfo.xml:29
+msgid "The mini screen needs a one-time setup on the host system, which the app explains. It gives the logged-in user access to the device and nothing else."
+msgstr "A minitela precisa de uma configuração única no sistema, que o app explica. Ela dá ao usuário conectado acesso ao dispositivo e a nada mais."
+
+#: data/dev.pragmatico.Minitela.metainfo.xml:33
+msgid "Not affiliated with Positivo Tecnologia or PoliCorp Tecnologia."
+msgstr "Sem relação com a Positivo Tecnologia ou a PoliCorp Tecnologia."
+
+#: data/dev.pragmatico.Minitela.metainfo.xml:60
+msgid "First preview."
+msgstr "Primeira prévia."
 
 #: minitela/ui/app.py:88
 msgid "Open Minitela"
@@ -50,8 +110,12 @@ msgid "Import official package…"
 msgstr "Importar pacote oficial…"
 
 #: minitela/ui/gifs.py:48
-msgid "No GIFs yet. Import the official package (minitela_*.deb) to get the 21 factory GIFs."
-msgstr "Nenhum GIF ainda. Importe o pacote oficial (minitela_*.deb) para obter os 21 GIFs de fábrica."
+msgid ""
+"No GIFs yet. Import the official package (minitela_*.deb) to get the 21 "
+"factory GIFs."
+msgstr ""
+"Nenhum GIF ainda. Importe o pacote oficial (minitela_*.deb) para obter os 21 "
+"GIFs de fábrica."
 
 #: minitela/ui/gifs.py:93
 #, python-brace-format
@@ -68,8 +132,12 @@ msgid "Send GIF {number}?"
 msgstr "Enviar o GIF {number}?"
 
 #: minitela/ui/gifs.py:107
-msgid "The mini screen reloads its layout with this GIF. It takes about 10 seconds; do not unplug or suspend the laptop meanwhile."
-msgstr "A minitela recarrega o layout com este GIF. Leva cerca de 10 segundos; não desconecte nem suspenda o notebook enquanto isso."
+msgid ""
+"The mini screen reloads its layout with this GIF. It takes about 10 seconds; "
+"do not unplug or suspend the laptop meanwhile."
+msgstr ""
+"A minitela recarrega o layout com este GIF. Leva cerca de 10 segundos; não "
+"desconecte nem suspenda o notebook enquanto isso."
 
 #: minitela/ui/gifs.py:111
 msgid "Cancel"
@@ -287,8 +355,12 @@ msgid "Allow access to the mini screen"
 msgstr "Permitir acesso à minitela"
 
 #: minitela/ui/window.py:97
-msgid "Run this once in a terminal. It lets the logged-in user use the mini screen and its keyboard key, and asks for your password."
-msgstr "Rode isto uma vez em um terminal. O comando deixa o usuário conectado usar a minitela e a tecla dela no teclado, e pede a sua senha."
+msgid ""
+"Run this once in a terminal. It lets the logged-in user use the mini screen "
+"and its keyboard key, and asks for your password."
+msgstr ""
+"Rode isto uma vez em um terminal. O comando deixa o usuário conectado usar a "
+"minitela e a tecla dela no teclado, e pede a sua senha."
 
 #: minitela/ui/window.py:103
 msgid "Close"

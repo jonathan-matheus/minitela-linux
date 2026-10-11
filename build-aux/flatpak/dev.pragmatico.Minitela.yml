@@ -46,9 +46,16 @@ modules:
     build-commands:
       # The build hook (hatch_build.py) compiles the translations with the SDK's gettext.
       - pip3 install --verbose --no-deps --no-index --no-build-isolation --prefix=${FLATPAK_DEST} .
-      - install -Dm644 data/dev.pragmatico.Minitela.desktop -t ${FLATPAK_DEST}/share/applications
-      - install -Dm644 data/icons/hicolor/scalable/apps/dev.pragmatico.Minitela.svg
+      # The .desktop and metainfo with the translations from po/ merged in.
+      - install -d ${FLATPAK_DEST}/share/applications ${FLATPAK_DEST}/share/metainfo
+      - msgfmt --desktop -d po --template data/${FLATPAK_ID}.desktop
+        -o ${FLATPAK_DEST}/share/applications/${FLATPAK_ID}.desktop
+      - msgfmt --xml -d po --template data/${FLATPAK_ID}.metainfo.xml
+        -o ${FLATPAK_DEST}/share/metainfo/${FLATPAK_ID}.metainfo.xml
+      - install -Dm644 data/icons/hicolor/scalable/apps/${FLATPAK_ID}.svg
         -t ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps
+      - install -Dm644 data/icons/hicolor/symbolic/apps/${FLATPAK_ID}-symbolic.svg
+        -t ${FLATPAK_DEST}/share/icons/hicolor/symbolic/apps
       # Piped out of the sandbox by the setup dialog's command (minitela/ui/setup.py).
       - install -Dm755 host/host-setup.sh -t ${FLATPAK_DEST}/share/minitela
     sources:

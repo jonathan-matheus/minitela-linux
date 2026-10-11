@@ -1,14 +1,14 @@
 # SOME DESCRIPTIVE TITLE.
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
-# This file is distributed under the same license as the minitela package.
+# This file is distributed under the same license as the PACKAGE package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
 #
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: minitela\n"
+"Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-11 17:09-0300\n"
+"POT-Creation-Date: 2026-10-11 17:22-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,6 +17,75 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: data/dev.pragmatico.Minitela.desktop:3
+msgid "Minitela"
+msgstr ""
+
+#: data/dev.pragmatico.Minitela.desktop:4
+msgid "Mini screen settings"
+msgstr ""
+
+#: data/dev.pragmatico.Minitela.desktop:5
+msgid ""
+"Show the time, weather, battery and messages on the Positivo Vision mini "
+"screen"
+msgstr ""
+
+#: data/dev.pragmatico.Minitela.desktop:10
+msgid "Positivo;Vision;mini screen;minitela;"
+msgstr ""
+
+#: data/dev.pragmatico.Minitela.metainfo.xml:9
+msgid "Control the mini screen of the Positivo Vision laptop"
+msgstr ""
+
+#: data/dev.pragmatico.Minitela.metainfo.xml:15
+msgid ""
+"Shows the time, weather, battery, connections, a reminder and WhatsApp "
+"messages on the small screen next to the keyboard of the Positivo Vision "
+"R15M, and lets you choose its GIF. An independent, open source replacement "
+"for the official app that works on any distribution."
+msgstr ""
+
+#: data/dev.pragmatico.Minitela.metainfo.xml:22
+msgid "Weather forecast for the chosen city, without an API key"
+msgstr ""
+
+#: data/dev.pragmatico.Minitela.metainfo.xml:23
+msgid "Battery, Wi-Fi and Bluetooth status"
+msgstr ""
+
+#: data/dev.pragmatico.Minitela.metainfo.xml:24
+msgid "Brightness and automatic page rotation"
+msgstr ""
+
+#: data/dev.pragmatico.Minitela.metainfo.xml:25
+msgid "The laptop's mini screen key switches pages"
+msgstr ""
+
+#: data/dev.pragmatico.Minitela.metainfo.xml:26
+msgid ""
+"The mini screen turns off when the laptop suspends or the session is locked"
+msgstr ""
+
+#: data/dev.pragmatico.Minitela.metainfo.xml:27
+msgid "Factory GIFs, imported from the official package"
+msgstr ""
+
+#: data/dev.pragmatico.Minitela.metainfo.xml:29
+msgid ""
+"The mini screen needs a one-time setup on the host system, which the app "
+"explains. It gives the logged-in user access to the device and nothing else."
+msgstr ""
+
+#: data/dev.pragmatico.Minitela.metainfo.xml:33
+msgid "Not affiliated with Positivo Tecnologia or PoliCorp Tecnologia."
+msgstr ""
+
+#: data/dev.pragmatico.Minitela.metainfo.xml:60
+msgid "First preview."
+msgstr ""
 
 #: minitela/ui/app.py:88
 msgid "Open Minitela"
