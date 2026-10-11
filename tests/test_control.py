@@ -111,3 +111,49 @@ def test_socket_path_in_flatpak(monkeypatch, tmp_path):
     monkeypatch.setenv("FLATPAK_ID", "dev.pragmatico.Minitela")
     monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path))
     assert control.socket_path() == tmp_path / "app" / "dev.pragmatico.Minitela" / "control.sock"
+
+
+@pytest.fixture
+def host_and_flatpak(monkeypatch, tmp_path):
+    """The host's and the Flatpak's socket paths, seen from the host."""
+    monkeypatch.delenv("FLATPAK_ID", raising=False)
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path))
+    return control.socket_paths()
+
+
+def test_socket_paths(host_and_flatpak, tmp_path):
+    assert host_and_flatpak == [
+        tmp_path / "minitela" / "control.sock",
+        tmp_path / "app" / "dev.pragmatico.Minitela" / "control.sock",
+    ]
+
+
+def test_socket_paths_in_flatpak(monkeypatch, tmp_path):
+    monkeypatch.setenv("FLATPAK_ID", "dev.pragmatico.Minitela")
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path))
+    assert control.socket_paths() == [tmp_path / "app" / "dev.pragmatico.Minitela" / "control.sock"]
+
+
+def test_host_command_reaches_the_flatpak_service(host_and_flatpak):
+    flatpak_service = ControlServer(lambda command: f"ok flatpak {command}", host_and_flatpak[1])
+    flatpak_service.start()
+    try:
+        assert send_command("next-page") == "ok flatpak next-page"
+    finally:
+        flatpak_service.stop()
+    with pytest.raises(ServiceNotRunning):
+        send_command("next-page")
+
+
+def test_host_service_is_refused_while_the_flatpak_one_runs(host_and_flatpak):
+    flatpak_service = ControlServer(lambda command: "ok", host_and_flatpak[1])
+    flatpak_service.start()
+    try:
+        with pytest.raises(OSError, match=r"dev\.pragmatico\.Minitela"):
+            ControlServer(lambda command: "ok").start()
+    finally:
+        flatpak_service.stop()
+    host_service = ControlServer(lambda command: "ok")
+    host_service.start()  # fine once the Flatpak's service is gone
+    assert send_command("ping") == "ok"
+    host_service.stop()

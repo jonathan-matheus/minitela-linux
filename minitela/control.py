@@ -20,13 +20,31 @@ log = logging.getLogger(__name__)
 TIMEOUT = 5.0
 
 
+FLATPAK_APP_ID = "dev.pragmatico.Minitela"
+
+
+def _runtime_dir() -> Path:
+    return Path(os.environ.get("XDG_RUNTIME_DIR") or f"/tmp/{APP_DIR}-{os.getuid()}")
+
+
 def socket_path() -> Path:
-    base = os.environ.get("XDG_RUNTIME_DIR") or f"/tmp/{APP_DIR}-{os.getuid()}"
+    """Where this installation's service listens."""
     if flatpak_id := os.environ.get("FLATPAK_ID"):
         # Each sandbox has its own runtime dir; only app/<id> is shared by all of the app's
         # instances (e.g. 'flatpak run --command=minitela ... next-page' from a key binding).
-        return Path(base) / "app" / flatpak_id / "control.sock"
-    return Path(base) / APP_DIR / "control.sock"
+        return _runtime_dir() / "app" / flatpak_id / "control.sock"
+    return _runtime_dir() / APP_DIR / "control.sock"
+
+
+def socket_paths() -> list[Path]:
+    """Where a service may listen: this installation's socket first, then the Flatpak's, which
+    is also visible from the host. A host install (e.g. a key binding running 'minitela
+    next-page') thus reaches the Flatpak's service, and the two never run at once."""
+    paths = [socket_path()]
+    flatpak = _runtime_dir() / "app" / FLATPAK_APP_ID / "control.sock"
+    if flatpak not in paths:
+        paths.append(flatpak)
+    return paths
 
 
 class ServiceNotRunning(ConnectionError):
@@ -35,18 +53,24 @@ class ServiceNotRunning(ConnectionError):
 
 def send_command(command: str, path: Path | None = None) -> str:
     """Send one command to the running service and return its reply."""
-    path = path or socket_path()
-    try:
-        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
-            connection.settimeout(TIMEOUT)
+    if path is None:
+        for candidate in socket_paths():
+            try:
+                return send_command(command, candidate)
+            except ServiceNotRunning as error:
+                not_running = error
+        raise not_running
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+        connection.settimeout(TIMEOUT)
+        try:
             connection.connect(str(path))
-            connection.sendall(command.encode() + b"\n")
-            connection.shutdown(socket.SHUT_WR)
-            reply = b""
-            while chunk := connection.recv(4096):
-                reply += chunk
-    except (FileNotFoundError, ConnectionRefusedError) as error:
-        raise ServiceNotRunning(str(error)) from error
+        except OSError as error:  # no socket, nobody listening, or a path we cannot use
+            raise ServiceNotRunning(f"{path}: {error}") from error
+        connection.sendall(command.encode() + b"\n")
+        connection.shutdown(socket.SHUT_WR)
+        reply = b""
+        while chunk := connection.recv(4096):
+            reply += chunk
     return reply.decode().strip()
 
 
@@ -56,18 +80,20 @@ class ControlServer:
     def __init__(self, handler: Callable[[str], str], path: Path | None = None):
         self._handler = handler
         self.path = path or socket_path()
+        self._others = [] if path else socket_paths()[1:]  # services of other installations
         self._server: socket.socket | None = None
         self._thread: threading.Thread | None = None
 
     def start(self) -> None:
         """Listen on the socket. Raises OSError if another service already does."""
         self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        try:
-            send_command("ping", self.path)
-        except ServiceNotRunning:
-            self.path.unlink(missing_ok=True)  # left over by a service that crashed
-        else:
-            raise OSError(f"another minitela service is running ({self.path})")
+        for path in (self.path, *self._others):
+            try:
+                send_command("ping", path)
+            except ServiceNotRunning:
+                continue
+            raise OSError(f"another minitela service is running ({path})")
+        self.path.unlink(missing_ok=True)  # left over by a service that crashed
         self._server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self._server.bind(str(self.path))
         self._server.listen()
