@@ -333,3 +333,75 @@ def test_build_sources(tmp_path):
     names = [s.name for s in build_sources(minimal, None, notifications, reminders)]
     assert names == ["settings", "clock", "reminder", "weather"]
     assert "notifications" not in [s.name for s in build_sources(Settings(), None, None)]
+
+
+# --- Blanking ------------------------------------------------------------------------------
+
+
+def connected_service(clock, screen, tmp_path, brightness=80):
+    """A service that already ran one step: connected, with brightness sent."""
+    path = tmp_path / "settings.json"
+    save_settings(Settings(brightness=brightness), path)
+    run = Run(clock, steps=1)
+    service = make_service(
+        clock, lambda: FakeTransport(screen), path, lambda s: [SettingsSource(s)], run
+    )
+    service.run()
+    service.connection.get_transport()  # reopen: run() closes the port when it stops
+    return service
+
+
+def test_blank_and_restore(clock, screen, tmp_path):
+    service = connected_service(clock, screen, tmp_path)
+    assert screen.numbers[7] == 80
+    service.set_blanked("sleep", True)
+    assert service.blanked
+    assert screen.numbers[7] == 0  # written immediately
+    clock.now += 60
+    service._step()
+    assert screen.numbers[7] == 0  # the settings source does not undo it
+    service.set_blanked("sleep", False)
+    assert screen.numbers[7] == 80
+
+
+def test_blanked_until_every_reason_is_gone(clock, screen, tmp_path):
+    service = connected_service(clock, screen, tmp_path)
+    service.set_blanked("sleep", True)
+    service.set_blanked("lock", True)
+    service.set_blanked("sleep", False)
+    assert screen.numbers[7] == 0
+    service.set_blanked("lock", False)
+    assert screen.numbers[7] == 80
+
+
+def test_repeated_events_are_harmless(clock, screen, tmp_path):
+    service = connected_service(clock, screen, tmp_path)
+    service.set_blanked("sleep", False)  # never blanked
+    service.set_blanked("sleep", True)
+    service.set_blanked("sleep", True)
+    assert screen.numbers[7] == 0
+
+
+def test_blank_while_disconnected_applies_on_connect(clock, screen, tmp_path):
+    run = Run(clock, steps=1)
+    service = make_service(
+        clock,
+        lambda: FakeTransport(screen),
+        tmp_path / "s.json",
+        lambda s: [SettingsSource(s)],
+        run,
+    )
+    service.set_blanked("sleep", True)
+    service.run()
+    assert screen.numbers[7] == 0
+
+
+def test_blank_write_failure_is_logged(clock, screen, tmp_path, caplog, monkeypatch):
+    service = connected_service(clock, screen, tmp_path)
+
+    def unplugged(data):
+        raise TransportError("write failed")
+
+    monkeypatch.setattr(service.connection.get_transport(), "_write", unplugged)
+    service.set_blanked("lock", True)
+    assert "could not change the brightness" in caplog.text

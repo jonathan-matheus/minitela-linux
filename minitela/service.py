@@ -1,6 +1,7 @@
 """Keeps the mini screen up to date: reads the data sources and sends what changed."""
 
 import logging
+import threading
 import time
 from collections.abc import Callable, Iterable
 from datetime import datetime
@@ -46,11 +47,13 @@ class Scheduler:
         self._due.clear()
         self._sent.clear()
 
-    def tick(self, device: Device) -> Values:
+    def tick(self, device: Device, overrides: Values | None = None) -> Values:
         """Read the sources that are due and send what changed. Returns what was sent.
 
+        `overrides` win over the sources (e.g. brightness 0 while the screen is blanked).
         Transport errors propagate; the values that failed are sent again later.
         """
+        overrides = overrides or {}
         now = self._clock()
         changed: Values = {}
         for source in self.sources:
@@ -63,6 +66,13 @@ class Scheduler:
                 log.exception("source %s failed", source.name)
                 continue
             changed |= {r: v for r, v in values.items() if self._sent.get(r) != v}
+        for register in overrides:
+            changed.pop(register, None)
+        return self.send(device, changed | overrides)
+
+    def send(self, device: Device, values: Values) -> Values:
+        """Send right away those of `values` that differ from what was last sent."""
+        changed = {r: v for r, v in values.items() if self._sent.get(r) != v}
         if changed:
             device.write_values(changed)
             self._sent |= changed
@@ -137,6 +147,8 @@ class Service:
         self.connection = Connection(open_transport, on_open=self._on_open)
         self._device: Device | None = None
         self._waiting_logged = False
+        self._lock = threading.RLock()  # serial I/O from the loop and from system events
+        self._blank_reasons: set[str] = set()
         self.running = False
 
     def run(self) -> None:
@@ -166,7 +178,8 @@ class Service:
             log.info("mini screen connected at %s", getattr(transport, "port", "?"))
             self._waiting_logged = False
         try:
-            sent = self.scheduler.tick(self._device)
+            with self._lock:
+                sent = self.scheduler.tick(self._device, self._overrides())
         except (TransportError, ResponseTimeout, ProtocolError) as error:
             log.warning("lost the mini screen: %s", error)
             self.connection.close()
@@ -174,6 +187,36 @@ class Service:
         for register, value in sent.items():
             log.info("%s = %r", register.name, value)
         return min(self.scheduler.seconds_until_due(), self.MAX_SLEEP)
+
+    @property
+    def blanked(self) -> bool:
+        return bool(self._blank_reasons)
+
+    def set_blanked(self, reason: str, blanked: bool) -> None:
+        """Turn the backlight off while any reason (sleep, lock...) holds, and back on after.
+
+        Safe to call from other threads; the change is written before returning, so a sleep
+        handler can let the system suspend right after.
+        """
+        with self._lock:
+            was_blanked = self.blanked
+            if blanked:
+                self._blank_reasons.add(reason)
+            else:
+                self._blank_reasons.discard(reason)
+            if self.blanked == was_blanked:
+                return
+            log.info("screen %s (%s)", "blanked" if self.blanked else "restored", reason)
+            if self._device is None or not self.connection.is_open:
+                return
+            brightness = {tags.BRIGHTNESS: 0 if self.blanked else self.settings.brightness}
+            try:
+                self.scheduler.send(self._device, brightness)
+            except (TransportError, ResponseTimeout, ProtocolError) as error:
+                log.warning("could not change the brightness: %s", error)
+
+    def _overrides(self) -> Values:
+        return {tags.BRIGHTNESS: 0} if self.blanked else {}
 
     def _on_open(self, transport: Transport) -> None:
         device = Device(transport)

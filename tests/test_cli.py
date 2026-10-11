@@ -13,6 +13,7 @@ from minitela.transport.discovery import SerialDevice
 from minitela.transport.fake import FakeTransport, SimulatedScreen
 
 MINITELA = SerialDevice("/dev/ttyACM0", "0324", "0324", "sxw-admin_CDC_DEMO")
+REAL_SLEEP_MONITOR = cli._sleep_monitor  # replaced in every test by the sleep_monitors fixture
 
 
 @pytest.fixture(autouse=True)
@@ -379,8 +380,10 @@ def test_reminder_send(data_home, plugged, screen):
 
 
 class FakeMonitor:
-    def __init__(self, on_notification, fail=False):
-        self.on_notification = on_notification
+    """Stands for NotificationMonitor and SleepMonitor; `callback` is what they would call."""
+
+    def __init__(self, callback, fail=False):
+        self.callback = callback
         self.fail = fail
         self.running = False
 
@@ -408,7 +411,7 @@ def run_notifications(monkeypatch, argv, notifications, fail=False):
     def sleep(seconds):
         if not pending:
             raise KeyboardInterrupt
-        monitors[0].on_notification(Notification(*pending.pop(0)))
+        monitors[0].callback(Notification(*pending.pop(0)))
 
     monkeypatch.setattr(cli, "_notification_monitor", make_monitor)
     monkeypatch.setattr(cli.time, "sleep", sleep)
@@ -511,6 +514,10 @@ class FakeService:
         self.open_transport, self.make_sources = open_transport, make_sources
         self.settings_path = settings_path
         self.stopped = False
+        self.blanked = []
+
+    def set_blanked(self, reason, blanked):
+        self.blanked.append((reason, blanked))
 
     def run(self):
         raise KeyboardInterrupt
@@ -529,6 +536,19 @@ def services(monkeypatch, config_home):
     )
     monkeypatch.setattr(cli.signal, "signal", lambda sig, handler: handlers.update({sig: handler}))
     return created, handlers
+
+
+@pytest.fixture(autouse=True)
+def sleep_monitors(monkeypatch):
+    """Never take a real logind inhibitor in tests."""
+    created = []
+
+    def make(on_sleep):
+        created.append(FakeMonitor(on_sleep))
+        return created[-1]
+
+    monkeypatch.setattr(cli, "_sleep_monitor", make)
+    return created
 
 
 @pytest.fixture
@@ -556,6 +576,30 @@ def test_run(monkeypatch, services, monitors, caplog):
     handlers[cli.signal.SIGTERM](15, None)
     assert service.stopped
     assert "running" in caplog.text
+
+
+def test_run_blanks_on_suspend(monkeypatch, services, monitors, sleep_monitors):
+    created, _ = services
+    monkeypatch.setattr(cli, "_system_bus", lambda: None)
+    cli.main(["run"])
+    (sleep_monitor,) = sleep_monitors
+    sleep_monitor.callback(True)
+    assert created[0].blanked == [("sleep", True)]
+    assert not sleep_monitor.running
+
+
+def test_run_without_logind(monkeypatch, services, monitors, caplog):
+    monkeypatch.setattr(cli, "_system_bus", lambda: None)
+    monkeypatch.setattr(cli, "_sleep_monitor", lambda on_sleep: FakeMonitor(on_sleep, fail=True))
+    assert cli.main(["run"]) == 0
+    assert "cannot blank the screen on suspend" in caplog.text
+
+
+def test_default_sleep_monitor():
+    pytest.importorskip("gi")
+    from minitela.system_gio import SleepMonitor
+
+    assert isinstance(REAL_SLEEP_MONITOR(lambda s: None), SleepMonitor)
 
 
 def test_run_without_notifications_or_system_bus(monkeypatch, services, caplog):
