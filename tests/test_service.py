@@ -145,3 +145,15 @@ def test_write_values(device, screen):
     device.write_values({tags.BATTERY_ICON: 1, tags.WIFI_NAME: "casa", tags.PAGE: 3})
     assert screen.numbers == {1150: 1, 2: 3}
     assert screen.texts == {1083: b"casa"}
+
+
+def test_rotation_with_the_scheduler(clock, device, screen):
+    from minitela.sources.rotation import RotationSource
+
+    scheduler = Scheduler([RotationSource([4, 5], seconds=15)], clock)
+    pages = []
+    for _ in range(4):
+        scheduler.tick(device)
+        pages.append(screen.numbers[2])
+        clock.now += scheduler.seconds_until_due()
+    assert pages == [4, 5, 4, 5]
