@@ -8,6 +8,7 @@ from collections.abc import Callable
 from minitela import __version__
 from minitela.device import PAGE_COUNT, Device
 from minitela.protocol import tags
+from minitela.protocol.commands import ProtocolError
 from minitela.transport.base import ResponseTimeout, TransportError
 from minitela.transport.connection import (
     DeviceNotFoundError,
@@ -128,5 +129,7 @@ def main(argv: list[str] | None = None) -> int:
         return _fail("mini screen not found. Is it connected?")
     except ResponseTimeout:
         return _fail("the mini screen did not answer.")
+    except ProtocolError as error:
+        return _fail(f"unexpected reply from the mini screen: {error}")
     except TransportError as error:
         return _fail(f"serial port error: {error}")

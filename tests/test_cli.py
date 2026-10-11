@@ -144,3 +144,19 @@ def test_handshake_failure_closes_port(monkeypatch, capsys):
     monkeypatch.setattr(cli, "Device", lambda t: Device(t, timeout=0.01, retries=0))
     assert cli.main(["brightness", "50"]) == 1
     assert not transport.is_open
+
+
+def test_unexpected_reply(monkeypatch, capsys):
+    from minitela.protocol.commands import Command
+    from minitela.protocol.frame import Frame
+
+    wrong_ack = Frame(Command.SET_REGISTER.response, bytes.fromhex("20 0000 0002 00"))
+
+    def responder(frame):
+        if frame.command == Command.HANDSHAKE:
+            return [Frame(Command.HANDSHAKE.response, (1024).to_bytes(4))]
+        return [wrong_ack]
+
+    monkeypatch.setattr(cli, "open_device", lambda path=None: FakeTransport(responder))
+    assert cli.main(["brightness", "50"]) == 1
+    assert "unexpected reply" in capsys.readouterr().err
