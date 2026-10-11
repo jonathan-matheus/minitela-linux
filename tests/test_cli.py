@@ -264,6 +264,7 @@ def test_upload_factory_gif(plugged, screen, factory, no_sleep, capsys):
     assert screen.numbers[2] == 5
     out = capsys.readouterr().out
     assert "100% (2304/2304 bytes)" in out
+    assert out.count("Sending texture") == 3  # 44%, 88%, 100%: once per percentage
     assert "showing the new GIF" in out
     assert no_sleep == [cli.RESTART_DELAY]
 
@@ -297,3 +298,12 @@ def test_upload_device_does_not_come_back(monkeypatch, screen, factory, no_sleep
     assert cli.main(["upload-acf", "5"]) == 1
     assert "did not come back" in capsys.readouterr().err
     assert len(no_sleep) == cli.RECONNECT_ATTEMPTS
+
+
+def test_progress_is_printed_once_per_percentage(capsys):
+    show = cli._progress_printer()
+    for sent in range(0, 1001, 1):
+        show(sent, 1000)
+    out = capsys.readouterr().out
+    assert out.count("Sending texture") == 101
+    assert out.endswith("100% (1000/1000 bytes)\n")

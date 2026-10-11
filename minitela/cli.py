@@ -146,17 +146,28 @@ def _texture(value: str) -> Path:
     return Path(value)
 
 
-def _print_progress(sent: int, total: int) -> None:
-    print(f"\rSending texture: {100 * sent // total:3d}% ({sent}/{total} bytes)", end="")
-    if sent == total:
-        print()
+def _progress_printer() -> Callable[[int, int], None]:
+    """Progress callback that rewrites one line, only when the percentage changes."""
+    shown = -1
+
+    def show(sent: int, total: int) -> None:
+        nonlocal shown
+        percent = 100 * sent // total
+        if percent == shown:
+            return
+        shown = percent
+        print(f"\rSending texture: {percent:3d}% ({sent}/{total} bytes)", end="")
+        if sent == total:
+            print()
+
+    return show
 
 
 def _upload_acf(args: argparse.Namespace) -> int:
     data = args.texture.read_bytes()
     device = _connected(args)
     with device.transport:
-        TextureUpload(device.transport, data, paced=args.paced, progress=_print_progress).run()
+        TextureUpload(device.transport, data, paced=args.paced, progress=_progress_printer()).run()
     # The device may restart to load the new texture; reopen the port when it is back.
     for attempt in range(RECONNECT_ATTEMPTS):
         time.sleep(RESTART_DELAY if attempt == 0 else 1.0)
