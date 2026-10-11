@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Flatpak
+.flatpak-builder/
+build-dir/
+repo/
+*.flatpak
+
+# Vendor assets: never commit files from the official package
+*.deb
+*.acf
+*.AppImage
+vendor/
