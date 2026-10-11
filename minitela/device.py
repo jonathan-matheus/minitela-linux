@@ -75,6 +75,15 @@ class Device:
         else:
             self.write_numbers({register.id: int(value)})
 
+    def write_values(self, values: Mapping[Register, int | str]) -> None:
+        """Write registers of both kinds: numbers batched together, then each text."""
+        numbers = {r.id: int(v) for r, v in values.items() if r.kind is Kind.NUMBER}
+        if numbers:
+            self.write_numbers(numbers)
+        for register, value in values.items():
+            if register.kind is Kind.TEXT:
+                self.write_text(register, str(value))
+
     def get_tag(self, register: Register) -> int | str:
         if register.kind is Kind.TEXT:
             return self.read_text(register)
