@@ -1,0 +1,64 @@
+# Build and install locally:
+#   flatpak run org.flatpak.Builder --user --install --force-clean build-dir \
+#       build-aux/flatpak/dev.pragmatico.Minitela.yml
+app-id: dev.pragmatico.Minitela
+runtime: org.gnome.Platform
+runtime-version: '51'
+sdk: org.gnome.Sdk
+command: minitela-app
+
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  # The mini screen is a USB serial port (/dev/ttyACM*); Flatpak has no narrower option for
+  # serial devices. Access is still limited to the logged-in user by the host's udev rule.
+  - --device=all
+  # Weather forecast and city search (Open-Meteo).
+  - --share=network
+  # Battery, Wi-Fi and Bluetooth for the "Battery and connections" page.
+  - --system-talk-name=org.freedesktop.UPower
+  - --system-talk-name=org.freedesktop.NetworkManager
+  - --system-talk-name=org.bluez
+  # Blank the mini screen on suspend (inhibitor + PrepareForSleep) and on lock (LockedHint).
+  - --system-talk-name=org.freedesktop.login1
+  # Blank the mini screen on lock, on desktops that report it through the screensaver.
+  - --talk-name=org.freedesktop.ScreenSaver
+  - --talk-name=org.gnome.ScreenSaver
+  # Tray icon.
+  - --talk-name=org.kde.StatusNotifierWatcher
+  # Hyprland's lock screen sends no D-Bus signal; its IPC socket tells instead.
+  - --filesystem=xdg-run/hypr
+  # Not granted by default: WhatsApp notifications need to watch the session bus, which
+  # only --socket=session-bus allows. See the README to enable it with 'flatpak override'.
+
+cleanup:
+  - /include
+  - /lib/pkgconfig
+  - '*.a'
+
+modules:
+  - python3-deps.json
+
+  - name: minitela
+    buildsystem: simple
+    build-commands:
+      # The build hook (hatch_build.py) compiles the translations with the SDK's gettext.
+      - pip3 install --verbose --no-deps --no-index --no-build-isolation --prefix=${FLATPAK_DEST} .
+      - install -Dm644 data/dev.pragmatico.Minitela.desktop -t ${FLATPAK_DEST}/share/applications
+      - install -Dm644 data/icons/hicolor/scalable/apps/dev.pragmatico.Minitela.svg
+        -t ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps
+    sources:
+      - type: dir
+        path: ../..
+        skip:
+          - .git
+          - .venv
+          - .flatpak-builder
+          - build-dir
+          - repo
+          - .pytest_cache
+          - .ruff_cache
+          - htmlcov
+          - minitela/locale
