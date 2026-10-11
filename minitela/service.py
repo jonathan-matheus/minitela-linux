@@ -92,11 +92,12 @@ def build_sources(
     system_bus: Bus | None,
     notifications: NotificationSource | None,
     reminders: ReminderStore | None = None,
+    now: Callable[[], datetime] = datetime.now,
 ) -> list[Source]:
     """The sources for the current settings. Sources whose service is missing are left out."""
     sources: list[Source] = [
         SettingsSource(settings),
-        ClockSource(),
+        ClockSource(now),
         ReminderSource(reminders or ReminderStore()),
         WeatherSource(settings.city),
     ]
