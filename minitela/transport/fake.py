@@ -1,8 +1,9 @@
 """In-memory stand-ins for the device, for tests and for running without hardware."""
 
+import hashlib
 from collections.abc import Callable, Iterable
 
-from minitela.protocol.commands import Command
+from minitela.protocol.commands import RESULT_OK, RESULT_PROCESSING, Command
 from minitela.protocol.frame import Frame, FrameDecoder
 from minitela.transport.base import Transport, TransportError
 
@@ -42,17 +43,48 @@ class SimulatedScreen:
     Reply layouts are the ones observed on the real device (tests/fixtures/device-replies.hex).
     """
 
-    def __init__(self, max_packet_length: int = 1024):
+    def __init__(self, max_packet_length: int = 1024, page_size: int = 1024):
         self.max_packet_length = max_packet_length
+        self.page_size = page_size
         self.numbers: dict[int, int] = {}
         self.texts: dict[int, bytes] = {}
+        self.download: dict | None = None  # address, size, file id and blocks being received
+        self.textures: dict[int, bytes] = {}  # completed downloads, by address
+        self.processing = False  # answer "processing" before each final download result
 
     def __call__(self, frame: Frame) -> list[Frame]:
         if frame.command == Command.HANDSHAKE:
             return [Frame(Command.HANDSHAKE.response, self.max_packet_length.to_bytes(4))]
         if frame.command == Command.SET_REGISTER:
             return [Frame(Command.SET_REGISTER.response, self._register_reply(frame.payload))]
+        if frame.command == Command.REQUEST_DOWNLOAD:
+            payload = frame.payload
+            self.download = {
+                "address": int.from_bytes(payload[:4]),
+                "size": int.from_bytes(payload[4:8]),
+                "file_id": payload[8:24],
+                "data": bytearray(int.from_bytes(payload[4:8])),
+            }
+            return self._result(Command.REQUEST_DOWNLOAD, RESULT_OK, self.page_size.to_bytes(4))
+        if frame.command == Command.DOWNLOAD_DATA and self.download is not None:
+            offset, block = int.from_bytes(frame.payload[:4]), frame.payload[4:]
+            self.download["data"][offset : offset + len(block)] = block
+            return self._result(Command.DOWNLOAD_DATA, RESULT_OK)
+        if frame.command == Command.DOWNLOAD_COMPLETE and self.download is not None:
+            download, self.download = self.download, None
+            data = bytes(download["data"])
+            ok = hashlib.md5(data).digest() == download["file_id"]
+            if ok:
+                self.textures[download["address"]] = data
+            return self._result(Command.DOWNLOAD_COMPLETE, RESULT_OK if ok else 1)
         return []
+
+    def _result(self, command: Command, result: int, prefix: bytes = b"") -> list[Frame]:
+        replies = []
+        if self.processing:
+            replies.append(Frame(command.response, prefix + RESULT_PROCESSING.to_bytes(4)))
+        replies.append(Frame(command.response, prefix + result.to_bytes(4)))
+        return replies
 
     def _register_reply(self, payload: bytes) -> bytes:
         header, body = payload[0], payload[1:]

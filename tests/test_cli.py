@@ -1,4 +1,6 @@
 import errno
+import json
+from dataclasses import asdict
 
 import pytest
 import serial
@@ -231,3 +233,67 @@ def test_import_invalid_deb(data_home, tmp_path, capsys):
 def test_gifs_before_import(data_home, capsys):
     assert cli.main(["gifs"]) == 1
     assert "import-deb" in capsys.readouterr().err
+
+
+@pytest.fixture
+def factory(data_home):
+    """An imported library with factory GIF 5."""
+    from minitela.assets import FactoryGif, library_dir
+
+    library = library_dir()
+    library.mkdir(parents=True)
+    texture = bytes(range(256)) * 9
+    (library / "texture5.acf").write_bytes(texture)
+    gif = FactoryGif(5, "texture5.acf", "preview5.gif", "unused", len(texture))
+    (library / "manifest.json").write_text(json.dumps({"gifs": [asdict(gif)]}))
+    return texture
+
+
+@pytest.fixture
+def no_sleep(monkeypatch):
+    slept = []
+    monkeypatch.setattr(cli.time, "sleep", slept.append)
+    return slept
+
+
+def test_upload_factory_gif(plugged, screen, factory, no_sleep, capsys):
+    from minitela.upload import TEXTURE_ADDRESS
+
+    assert cli.main(["upload-acf", "5"]) == 0
+    assert screen.textures[TEXTURE_ADDRESS] == factory
+    assert screen.numbers[2] == 5
+    out = capsys.readouterr().out
+    assert "100% (2304/2304 bytes)" in out
+    assert "showing the new GIF" in out
+    assert no_sleep == [cli.RESTART_DELAY]
+
+
+def test_upload_file(plugged, screen, tmp_path, no_sleep):
+    from minitela.upload import TEXTURE_ADDRESS
+
+    path = tmp_path / "custom.acf"
+    path.write_bytes(b"texture")
+    assert cli.main(["upload-acf", "--paced", str(path)]) == 0
+    assert screen.textures[TEXTURE_ADDRESS] == b"texture"
+
+
+def test_upload_unknown_gif(plugged, data_home, capsys):
+    with pytest.raises(SystemExit):
+        cli.main(["upload-acf", "5"])
+    assert "import-deb" in capsys.readouterr().err
+
+
+def test_upload_device_does_not_come_back(monkeypatch, screen, factory, no_sleep, capsys):
+    opened = []
+
+    def open_device(path=None):
+        opened.append(path)
+        transport = FakeTransport(screen)
+        if len(opened) > 1:  # every reopening after the upload fails
+            transport.disconnect()
+        return transport
+
+    monkeypatch.setattr(cli, "open_device", open_device)
+    assert cli.main(["upload-acf", "5"]) == 1
+    assert "did not come back" in capsys.readouterr().err
+    assert len(no_sleep) == cli.RECONNECT_ATTEMPTS

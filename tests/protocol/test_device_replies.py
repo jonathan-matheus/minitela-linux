@@ -3,9 +3,12 @@
 from captures import FIXTURES, read_capture
 
 from minitela.protocol.commands import (
+    RESULT_OK,
     Command,
     DownloadStatusResponse,
     HandshakeResponse,
+    RequestDownloadResponse,
+    ResultResponse,
     parse_response,
 )
 from minitela.protocol.frame import Frame, FrameDecoder
@@ -52,3 +55,19 @@ def test_simulated_screen_replies_like_the_device():
         if request.command != Command.SET_REGISTER or request.payload[0] == 0xE0:
             continue  # the simulator knows no version strings
         assert screen(request) == [reply]
+
+
+def test_upload_replies():
+    """The device's answers while receiving a texture (tests/fixtures/device-upload.hex)."""
+    decoder = FrameDecoder()
+    replies = [
+        frame
+        for _, direction, data in read_capture(FIXTURES / "device-upload.hex")
+        if direction == "<"
+        for frame in decoder.feed(data)
+    ]
+    parsed = [parse_response(frame) for frame in replies]
+    assert parsed[0] == HandshakeResponse(max_packet_length=1024)
+    assert parsed[1] == RequestDownloadResponse(max_page_size=1024, result=RESULT_OK)
+    assert all(r == ResultResponse(Command.DOWNLOAD_DATA, RESULT_OK) for r in parsed[2:-1])
+    assert parsed[-1] == ResultResponse(Command.DOWNLOAD_COMPLETE, RESULT_OK)

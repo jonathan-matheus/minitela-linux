@@ -26,6 +26,7 @@ respostas do dispositivo estão em `device-replies.hex`, gravado com o nosso pr�
 | `reminder.hex` | Gravação de um lembrete (com e sem quebras de linha) |
 | `clock.hex` | Atualização de data e hora a cada minuto |
 | `refresh-after-reconnect.hex` | Reenvio completo depois de reabrir a porta |
+| `device-upload.hex` | **Nosso** envio da textura de fábrica 5: respostas do dispositivo ao pedido, aos blocos e ao fim do envio (os blocos de dados ficam de fora) |
 | `device-replies.hex` | **Nossas** requisições e as respostas do dispositivo: handshake, estado de download, leitura de versão e registradores, confirmações de escrita |
 
 Arquivos com prefixo `device-` são sessões do nosso código, não do app oficial, e ficam fora

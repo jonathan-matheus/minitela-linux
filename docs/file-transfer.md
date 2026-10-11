@@ -40,7 +40,7 @@ da última gravação, o que permite:
 
 ## Estados do dispositivo
 
-Resposta de `GET_DOWNLOAD_STATUS`:
+Resposta de `GET_DOWNLOAD_STATUS`, segundo o MiniPanel:
 
 | Estado | Significado |
 |---|---|
@@ -48,30 +48,32 @@ Resposta de `GET_DOWNLOAD_STATUS`:
 | `0x11` | Recebendo um arquivo (gravação em andamento ou interrompida) |
 | `0x20` | Executando o layout AHMI (operação normal) |
 
-## Fluxo recomendado
+O firmware da minitela (`1.10.19_build_2024.09.20_GIFTest`) não segue isso: responde `0x10`
+mesmo funcionando normalmente, com 3 bytes a mais, e o campo do id não é o MD5 da última
+gravação. `GET_OFFSET` não tem resposta. Por isso **não há como retomar** uma gravação
+interrompida: um envio que falha deve ser refeito do começo.
 
-Baseado no MiniPanel, que confere a resposta de cada etapa:
+## Fluxo usado (confirmado no dispositivo)
+
+Gravação da textura de fábrica 5 (1.622.024 bytes) em `tests/fixtures/device-upload.hex`:
 
 ```
 1. HANDSHAKE
-2. GET_DOWNLOAD_STATUS  → estado, id, offset
-     estado 0x20 e id == MD5 do arquivo  → já gravado, fim
-     estado 0x20 e id != MD5             → SWITCH_STATE(0x10), exige código 0
-     estado 0x10/0x11 e id == MD5        → retoma a partir do offset
-     estado 0x10/0x11 e id != MD5        → começa do offset 0
-3. REQUEST_DOWNLOAD(0x08100000, tamanho, MD5)
-     → tamanho máximo de página, código
-     código 0xFFFFFFFF → aguardar nova resposta com código 0 (até 60 s)
-4. para cada bloco de até "tamanho máximo de página" bytes:
-     DOWNLOAD_DATA(offset, bloco)
-       código 0           → próximo bloco
-       código 0xFFFFFFFF  → aguardar nova resposta com código 0 (até 60 s)
-       outro código       → reenviar o mesmo bloco
-5. DOWNLOAD_COMPLETE
-     código 0xFFFFFFFF → aguardar nova resposta com código 0 (até 5 s)
-     o MiniPanel ignora erros nesta etapa
-6. Mostrar a página do GIF: SET_REGISTER página = 5
+2. REQUEST_DOWNLOAD(0x08100000, tamanho, MD5)
+     resposta em ~2,3 s (apagando a flash): página de 1024 bytes, código 0
+     não é repetido em caso de demora: repetir recomeçaria o apagamento
+3. DOWNLOAD_DATA(offset, bloco de 1024 bytes), 1585 vezes
+     cada bloco é confirmado com código 0 em ~2 ms
+     código 0xFFFFFFFF → aguardar a resposta final; outro código → reenviar o bloco
+4. DOWNLOAD_COMPLETE → código 0
+5. SET_REGISTER página = 5, para mostrar o GIF
 ```
+
+O envio inteiro levou **7,3 s**. A porta serial continuou aberta, sem reiniciar o USB, mas o
+layout foi recarregado: a página voltou para 1, por isso o passo 5 é necessário.
+
+O MiniPanel consulta o estado antes (passo extra entre 1 e 2) para pular texturas já gravadas
+e retomar envios; como este firmware não informa isso, o passo é omitido.
 
 Durante a gravação, nenhum outro comando (registradores, troca de página) deve ser enviado.
 Os dois apps oficiais param o envio periódico de dados enquanto gravam.
@@ -82,15 +84,15 @@ Mais simples e menos robusto. Não lê o estado nem as respostas:
 
 1. Fecha a porta serial, espera 1 s e reabre.
 2. Envia `REQUEST_DOWNLOAD(0x08100000, tamanho, MD5)` e espera 200 ms.
-3. Espera 3 s (tempo para apagar a flash ❓).
+3. Espera 3 s, tempo para apagar a flash (no dispositivo, o apagamento levou ~2,3 s).
 4. Envia blocos de **1024 bytes** com `DOWNLOAD_DATA`, um a cada 10 ms, sem esperar
    resposta.
 5. Envia `DOWNLOAD_COMPLETE`. O quadro tem `ctrl = 0x000A` mas só 4 bytes de conteúdo
    e nenhum campo de CRC, ou seja, está malformado. O dispositivo parece tolerar.
 6. Espera 3 s, reabre a porta (até 10 tentativas) e muda para a página 5.
 
-Isso mostra que o dispositivo aceita os dados sem que se espere por cada resposta, e dá
-valores de referência para os tempos de espera.
+Esse modo continua disponível como alternativa (`minitela upload-acf --paced`), mas o fluxo
+confirmado acima é tão rápido quanto e detecta blocos perdidos.
 
 ## Formato `.acf`
 

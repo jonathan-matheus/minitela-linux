@@ -3,6 +3,7 @@
 import argparse
 import logging
 import sys
+import time
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
@@ -19,6 +20,7 @@ from minitela.transport.connection import (
     open_device,
 )
 from minitela.transport.discovery import find_minitela
+from minitela.upload import TextureUpload
 
 
 def _probe(args: argparse.Namespace) -> int:
@@ -128,6 +130,47 @@ def _list_gifs(args: argparse.Namespace) -> int:
     return 0
 
 
+RESTART_DELAY = 3.0  # the official app waits this long before reopening the port
+RECONNECT_ATTEMPTS = 10
+
+
+def _texture(value: str) -> Path:
+    """A factory GIF number (see 'minitela gifs') or the path of an .acf file."""
+    if value.isdigit():
+        for gif in load_library():
+            if gif.number == int(value):
+                return library_dir() / gif.texture
+        raise argparse.ArgumentTypeError(
+            f"no factory GIF {value}: run 'minitela import-deb' first, then 'minitela gifs'"
+        )
+    return Path(value)
+
+
+def _print_progress(sent: int, total: int) -> None:
+    print(f"\rSending texture: {100 * sent // total:3d}% ({sent}/{total} bytes)", end="")
+    if sent == total:
+        print()
+
+
+def _upload_acf(args: argparse.Namespace) -> int:
+    data = args.texture.read_bytes()
+    device = _connected(args)
+    with device.transport:
+        TextureUpload(device.transport, data, paced=args.paced, progress=_print_progress).run()
+    # The device may restart to load the new texture; reopen the port when it is back.
+    for attempt in range(RECONNECT_ATTEMPTS):
+        time.sleep(RESTART_DELAY if attempt == 0 else 1.0)
+        try:
+            device = _connected(args)
+        except (TransportError, ResponseTimeout):
+            continue
+        with device.transport:
+            device.show_page(tags.Page.GIF1)
+        print("Done: showing the new GIF")
+        return 0
+    return _fail("the texture was sent, but the mini screen did not come back")
+
+
 def _page_number(value: str) -> int:
     """A page number or name (whatsapp, reminder, system_info, weather, gif1...)."""
     names = ", ".join(page.name.lower() for page in tags.Page)
@@ -179,6 +222,16 @@ def build_parser() -> argparse.ArgumentParser:
     import_cmd.set_defaults(handler=_import_deb)
     gifs = subcommands.add_parser("gifs", help="list the imported factory GIFs")
     gifs.set_defaults(handler=_list_gifs)
+    upload = subcommands.add_parser(
+        "upload-acf", help="write a texture (factory GIF number or .acf file) to the screen"
+    )
+    upload.add_argument("texture", type=_texture)
+    upload.add_argument(
+        "--paced",
+        action="store_true",
+        help="send blocks every 10 ms without waiting for replies, like the official app",
+    )
+    upload.set_defaults(handler=_upload_acf)
     return parser
 
 
