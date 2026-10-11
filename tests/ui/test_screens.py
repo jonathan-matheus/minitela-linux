@@ -84,3 +84,28 @@ def test_brightness_previews_at_once_and_saves_once(page, previews, monkeypatch)
     assert load_settings().brightness == 100  # not saved while the slider moves
     run_main_loop(50)
     assert load_settings().brightness == 50
+
+
+def test_autostart(store, shown, previews):
+    calls, messages = [], []
+    page = ScreensPage(store, shown.append, previews.append, messages.append, calls.append)
+    assert not page.autostart_row.get_active()
+    page.autostart_row.set_active(True)
+    assert calls == [True]
+    assert load_settings().autostart
+    page.autostart_row.set_active(False)
+    assert calls == [True, False]
+    assert not load_settings().autostart
+
+
+def test_autostart_failure_is_undone(store, shown, previews):
+    messages = []
+
+    def refuse(enabled):
+        raise OSError("portal not available")
+
+    page = ScreensPage(store, shown.append, previews.append, messages.append, refuse)
+    page.autostart_row.set_active(True)
+    assert not page.autostart_row.get_active()
+    assert not load_settings().autostart
+    assert messages == ["Could not change starting with the session: portal not available"]

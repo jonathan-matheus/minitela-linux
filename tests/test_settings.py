@@ -41,6 +41,7 @@ def test_round_trip(path):
         {"pages": "abc"},
         {"rotation_seconds": -5},
         {"notifications": "yes"},
+        {"autostart": 1},
         {"city": {"name": "Recife"}},
         {"city": "Recife"},
     ],

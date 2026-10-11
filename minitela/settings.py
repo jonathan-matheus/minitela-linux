@@ -27,6 +27,7 @@ class Settings:
     pages: list[int] = field(default_factory=lambda: [int(p) for p in DEFAULT_PAGES])
     rotation_seconds: int = 0  # 0: no automatic rotation
     notifications: bool = True
+    autostart: bool = False  # start the app, hidden, with the session
 
 
 def settings_path() -> Path:
@@ -50,7 +51,7 @@ def _valid(name: str, value: Any) -> Any:
         if not isinstance(value, int) or value < 0:
             raise ValueError(value)
         return value
-    # notifications
+    # notifications, autostart
     if not isinstance(value, bool):
         raise TypeError(value)
     return value

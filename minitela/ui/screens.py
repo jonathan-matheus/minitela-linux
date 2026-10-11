@@ -8,7 +8,9 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, GLib, Gtk  # noqa: E402
 
+from minitela.dbus import BusError  # noqa: E402
 from minitela.protocol.tags import Page  # noqa: E402
+from minitela.ui.autostart import set_autostart  # noqa: E402
 from minitela.ui.store import SettingsStore  # noqa: E402
 
 PAGE_TITLES = {
@@ -28,11 +30,15 @@ class ScreensPage(Adw.PreferencesPage):
         store: SettingsStore,
         show_page: Callable[[int], None],
         preview_brightness: Callable[[int], None],
+        notify: Callable[[str], None] = lambda message: None,
+        set_autostart: Callable[[bool], None] = set_autostart,
     ):
         super().__init__(title="Screen", icon_name="video-display-symbolic")
         self._store = store
         self._show_page = show_page
         self._preview_brightness = preview_brightness
+        self._notify = notify
+        self._set_autostart = set_autostart
         self._save_source = 0
 
         brightness = Adw.PreferencesGroup(title="Brightness")
@@ -79,6 +85,29 @@ class ScreensPage(Adw.PreferencesPage):
         rotation.add(self.rotate_row)
         rotation.add(self.interval_row)
         self.add(rotation)
+
+        background = Adw.PreferencesGroup(
+            title="Background",
+            description="The mini screen keeps updating while the window is closed",
+        )
+        self.autostart_row = Adw.SwitchRow(
+            title="Start with the session", active=store.settings.autostart
+        )
+        self.autostart_row.connect("notify::active", self._on_autostart_changed)
+        background.add(self.autostart_row)
+        self.add(background)
+
+    def _on_autostart_changed(self, row: Adw.SwitchRow, _param) -> None:
+        enabled = row.get_active()
+        if enabled == self._store.settings.autostart:
+            return
+        try:
+            self._set_autostart(enabled)
+        except (OSError, BusError) as error:
+            row.set_active(not enabled)
+            self._notify(f"Could not change starting with the session: {error}")
+            return
+        self._store.update(autostart=enabled)
 
     def _on_brightness_changed(self, scale: Gtk.Scale) -> None:
         self._preview_brightness(int(scale.get_value()))

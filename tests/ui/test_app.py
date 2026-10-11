@@ -51,9 +51,9 @@ class FakeRunner:
 APP_IDS = itertools.count()
 
 
-def make_app(runner):
+def make_app(runner, background=False):
     """An app with its own ID: two apps with the same ID clash in one process."""
-    app = MinitelaApp(make_runner=lambda: runner)
+    app = MinitelaApp(make_runner=lambda: runner, background=background)
     app.set_application_id(f"dev.pragmatico.Minitela.Test{next(APP_IDS)}")
     app.set_flags(Gio.ApplicationFlags.NON_UNIQUE)
     return app
@@ -105,10 +105,44 @@ def test_signals_quit(monkeypatch):
 
 def test_main(monkeypatch):
     calls = []
-    monkeypatch.setattr(MinitelaApp, "run", lambda self, argv: calls.append(argv) or 0)
+    monkeypatch.setattr(
+        MinitelaApp, "run", lambda self, argv: calls.append((argv, self._start_hidden)) or 0
+    )
     assert app_module.main(["minitela-app"]) == 0
-    assert calls == [["minitela-app"]]
-    assert signal.SIGTERM  # handled through GLib once the app starts
+    assert app_module.main(["minitela-app", "--background"]) == 0
+    assert calls == [(["minitela-app"], False), (["minitela-app"], True)]
+
+
+def test_background_start_shows_no_window_until_activated_again():
+    app = make_app(FakeRunner(), background=True)
+    app.register(None)
+    app.activate()
+    assert app.get_windows() == []
+    app.activate()
+    assert len(app.get_windows()) == 1
+    app.do_shutdown()
+
+
+def test_keeps_running_without_windows_and_quits(monkeypatch):
+    app = make_app(FakeRunner())
+    held = []
+    monkeypatch.setattr(app, "hold", lambda: held.append("hold"))
+    monkeypatch.setattr(app, "release", lambda: held.append("release"))
+    app.register(None)
+    assert held == ["hold"]
+    app.activate_action("quit", None)
+    assert held == ["hold", "release"]
+    app.do_shutdown()
+
+
+def test_quit_without_own_service(monkeypatch):
+    app = make_app(FakeRunner(refuse=True))
+    released = []
+    monkeypatch.setattr(app, "release", lambda: released.append(True))
+    app.register(None)
+    app.quit()
+    assert released == []
+    app.do_shutdown()
 
 
 def test_signal_handler_fallback(monkeypatch):

@@ -72,3 +72,12 @@ def test_show_page_failure_is_reported(window, commands, monkeypatch):
 def test_preview_brightness(window, commands):
     window.preview_brightness(40)
     assert commands.sent == ["brightness 40"]
+
+
+def test_menu_has_quit(window):
+    from gi.repository import Gtk
+    from widgets import find_widget
+
+    button = find_widget(window.header, Gtk.MenuButton)
+    model = button.get_menu_model()
+    assert model.get_item_attribute_value(0, "action").get_string() == "app.quit"

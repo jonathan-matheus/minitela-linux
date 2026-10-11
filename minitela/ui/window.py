@@ -6,7 +6,7 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gdk, Gtk  # noqa: E402
+from gi.repository import Adw, Gdk, Gio, Gtk  # noqa: E402
 
 from minitela.service import State, Status  # noqa: E402
 from minitela.sources.reminder import ReminderStore  # noqa: E402
@@ -31,7 +31,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.store = store
         self._command = command
         self.stack = Adw.ViewStack()
-        self.screens = ScreensPage(store, self.show_page, self.preview_brightness)
+        self.screens = ScreensPage(store, self.show_page, self.preview_brightness, self.notify)
         self.weather = WeatherPage(store)
         self.reminder = ReminderPage(ReminderStore(), self.show_page)
         self.gifs = GifsPage(upload, self.notify)
@@ -42,9 +42,12 @@ class MainWindow(Adw.ApplicationWindow):
             ("gifs", self.gifs),
         ):
             self.stack.add_titled_with_icon(page, name, page.get_title(), page.get_icon_name())
+        menu = Gio.Menu()
+        menu.append("Quit (stop updating the mini screen)", "app.quit")
         self.header = Adw.HeaderBar(
             title_widget=Adw.ViewSwitcher(stack=self.stack, policy=Adw.ViewSwitcherPolicy.WIDE)
         )
+        self.header.pack_end(Gtk.MenuButton(icon_name="open-menu-symbolic", menu_model=menu))
         self.banner = Adw.Banner()
         self.banner.connect("button-clicked", lambda banner: self.show_setup_dialog())
         self.toasts = Adw.ToastOverlay(child=self.stack)

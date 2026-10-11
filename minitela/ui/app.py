@@ -37,9 +37,11 @@ def _add_signal_handler(signum: int, handler: Callable[[], bool]) -> None:
 
 
 class MinitelaApp(Adw.Application):
-    def __init__(self, make_runner: Callable[[], Runner] = Runner):
+    def __init__(self, make_runner: Callable[[], Runner] = Runner, background: bool = False):
+        """`background`: start without a window (with the session)."""
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
         self._make_runner = make_runner
+        self._start_hidden = background
         self.runner: Runner | None = None
         self._thread: threading.Thread | None = None
         self.state: State | None = None  # None: another process drives the screen
@@ -51,6 +53,10 @@ class MinitelaApp(Adw.Application):
             Gtk.IconTheme.get_for_display(display).add_search_path(str(SOURCE_ICONS))
         for signum in (signal.SIGINT, signal.SIGTERM):
             _add_signal_handler(signum, self._on_signal)
+        quit_action = Gio.SimpleAction(name="quit")
+        quit_action.connect("activate", lambda action, parameter: self.quit())
+        self.add_action(quit_action)
+        self.set_accels_for_action("app.quit", ["<Control>q"])
         runner = self._make_runner()
         try:
             runner.start()
@@ -59,12 +65,16 @@ class MinitelaApp(Adw.Application):
             log.warning("not starting the service: %s", error)
             return
         self.runner = runner
+        self.hold()  # keep running, and updating the screen, with no window open
         self.state = runner.service.state
         runner.service.add_listener(lambda state: GLib.idle_add(self._show_state, state))
         self._thread = threading.Thread(target=runner.run, name="minitela-service", daemon=True)
         self._thread.start()
 
     def do_activate(self) -> None:
+        if self._start_hidden:
+            self._start_hidden = False  # launching the app again shows the window
+            return
         window = self.props.active_window
         if window is None:
             upload = self.runner.service.upload_texture if self.runner is not None else None
@@ -100,7 +110,16 @@ class MinitelaApp(Adw.Application):
             self.runner = None
         Adw.Application.do_shutdown(self)
 
+    def quit(self) -> None:
+        if self.runner is not None:
+            self.release()  # balance the hold() taken when the service started
+        super().quit()
+
 
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s: %(message)s")
-    return MinitelaApp().run(sys.argv if argv is None else argv)
+    argv = list(sys.argv if argv is None else argv)
+    background = "--background" in argv
+    if background:
+        argv.remove("--background")
+    return MinitelaApp(background=background).run(argv)
