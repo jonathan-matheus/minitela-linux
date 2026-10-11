@@ -12,6 +12,7 @@ from minitela.protocol.registers import (
     read_string,
     write_numbers,
     write_string,
+    written_registers,
 )
 
 
@@ -133,3 +134,11 @@ def test_parse_malformed_write_ack(payload_hex):
 def test_parse_wrong_command():
     with pytest.raises(ProtocolError):
         parse_register_values(Frame(Command.HANDSHAKE.response, b"\x00\x00\x04\x00"))
+
+
+def test_written_registers():
+    (numbers,) = write_numbers([(7, 1), (2, 3)])
+    assert written_registers(numbers) == (7, 2)
+    assert written_registers(write_string(1082, "x")) == (1082,)
+    with pytest.raises(ValueError):
+        written_registers(read_string(1082, 4))

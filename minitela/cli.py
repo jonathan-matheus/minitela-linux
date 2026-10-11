@@ -6,7 +6,7 @@ import sys
 from collections.abc import Callable
 
 from minitela import __version__
-from minitela.device import Device
+from minitela.device import PAGE_COUNT, Device
 from minitela.protocol import tags
 from minitela.transport.base import ResponseTimeout, TransportError
 from minitela.transport.connection import (
@@ -39,6 +39,51 @@ def _probe(args: argparse.Namespace) -> int:
     return 0
 
 
+def _connected(args: argparse.Namespace) -> Device:
+    """Open the port and handshake. The caller closes `device.transport`."""
+    transport = open_device(args.port)
+    device = Device(transport)
+    try:
+        device.handshake()
+    except Exception:
+        transport.close()
+        raise
+    return device
+
+
+def _brightness(args: argparse.Namespace) -> int:
+    device = _connected(args)
+    with device.transport:
+        device.set_brightness(args.percent)
+    return 0
+
+
+def _page(args: argparse.Namespace) -> int:
+    device = _connected(args)
+    with device.transport:
+        device.show_page(args.page)
+    return 0
+
+
+def _page_number(value: str) -> int:
+    """A page number or name (whatsapp, reminder, system_info, weather, gif1...)."""
+    names = ", ".join(page.name.lower() for page in tags.Page)
+    if value.isdigit() and 1 <= int(value) <= PAGE_COUNT:
+        return int(value)
+    try:
+        return tags.Page[value.upper()]
+    except KeyError:
+        message = f"unknown page {value!r} (use 1-{PAGE_COUNT} or {names})"
+        raise argparse.ArgumentTypeError(message) from None
+
+
+def _percent(value: str) -> int:
+    number = int(value)
+    if not 0 <= number <= 100:
+        raise argparse.ArgumentTypeError("brightness must be between 0 and 100")
+    return number
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="minitela", description=__doc__)
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
@@ -47,6 +92,12 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands = parser.add_subparsers(title="commands", dest="command")
     probe = subcommands.add_parser("probe", help="find the mini screen and show its state")
     probe.set_defaults(handler=_probe)
+    brightness = subcommands.add_parser("brightness", help="set the backlight (0-100)")
+    brightness.add_argument("percent", type=_percent)
+    brightness.set_defaults(handler=_brightness)
+    page = subcommands.add_parser("page", help="show a page (number or name)")
+    page.add_argument("page", type=_page_number)
+    page.set_defaults(handler=_page)
     return parser
 
 

@@ -114,3 +114,33 @@ def test_link_failure(monkeypatch, capsys):
     monkeypatch.setattr(cli, "open_device", lambda path=None: transport)
     assert cli.main(["probe"]) == 1
     assert "serial port error" in capsys.readouterr().err
+
+
+def test_brightness(plugged, screen):
+    assert cli.main(["brightness", "30"]) == 0
+    assert screen.numbers[7] == 30
+
+
+@pytest.mark.parametrize(("arg", "page"), [("4", 4), ("weather", 4), ("GIF1", 5), ("10", 10)])
+def test_page(plugged, screen, arg, page):
+    assert cli.main(["page", arg]) == 0
+    assert screen.numbers[2] == page
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [["brightness", "150"], ["brightness", "x"], ["page", "nope"], ["page", "0"], ["page", "11"]],
+)
+def test_invalid_arguments(plugged, capsys, argv):
+    with pytest.raises(SystemExit) as exc:
+        cli.main(argv)
+    assert exc.value.code == 2
+    assert plugged == []
+
+
+def test_handshake_failure_closes_port(monkeypatch, capsys):
+    transport = FakeTransport()
+    monkeypatch.setattr(cli, "open_device", lambda path=None: transport)
+    monkeypatch.setattr(cli, "Device", lambda t: Device(t, timeout=0.01, retries=0))
+    assert cli.main(["brightness", "50"]) == 1
+    assert not transport.is_open

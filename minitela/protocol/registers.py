@@ -60,6 +60,17 @@ def write_string(register: int, text: str, max_length: int | None = None) -> Fra
     return Frame(Command.SET_REGISTER, payload)
 
 
+def written_registers(frame: Frame) -> tuple[int, ...]:
+    """IDs of the registers a write frame sets, in order."""
+    header, body = frame.payload[0], frame.payload[1:]
+    if header == _WRITE_STRING:
+        return (int.from_bytes(body[:2]),)
+    if header & 0xF0 != _WRITE_NUMBERS:
+        raise ValueError(f"not a register write: {frame.payload[:1].hex()}")
+    count = (header & 0x0F) + 1
+    return tuple(int.from_bytes(body[i * 6 : i * 6 + 2]) for i in range(count))
+
+
 def read_numbers(registers: Iterable[int]) -> list[Frame]:
     """Frames that request the value of numeric registers, at most 16 per frame."""
     frames = []

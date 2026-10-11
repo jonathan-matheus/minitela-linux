@@ -2,7 +2,8 @@ import pytest
 
 from minitela.device import Device
 from minitela.protocol import tags
-from minitela.protocol.commands import handshake
+from minitela.protocol.commands import Command, ProtocolError, handshake
+from minitela.protocol.frame import Frame
 from minitela.transport.base import ResponseTimeout
 from minitela.transport.fake import FakeTransport, SimulatedScreen
 
@@ -55,3 +56,50 @@ def test_read_text_strips_padding(device, screen):
 def test_read_text_with_invalid_utf8(device, screen):
     screen.texts = {10: b"v\xff1"}
     assert device.read_text(tags.SOFTWARE_VERSION) == "v�1"
+
+
+def test_set_brightness(device, screen):
+    device.set_brightness(30)
+    assert screen.numbers == {7: 30}
+
+
+@pytest.mark.parametrize("percent", [-1, 101])
+def test_set_brightness_out_of_range(device, transport, percent):
+    with pytest.raises(ValueError):
+        device.set_brightness(percent)
+    assert transport.sent == []
+
+
+def test_show_page(device, screen):
+    device.show_page(tags.Page.WEATHER)
+    assert screen.numbers == {2: 4}
+
+
+@pytest.mark.parametrize("page", [0, 11])
+def test_show_page_out_of_range(device, transport, page):
+    with pytest.raises(ValueError):
+        device.show_page(page)
+    assert transport.sent == []
+
+
+def test_write_numbers_in_several_frames(device, screen, transport):
+    device.write_numbers({i: i for i in range(1, 21)})
+    assert len(transport.sent) == 2
+    assert screen.numbers == {i: i for i in range(1, 21)}
+
+
+def ack_for(registers: bytes, status: int = 0) -> Frame:
+    return Frame(Command.SET_REGISTER.response, bytes([0x20, status, 0]) + registers + b"\0")
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        ack_for(b"\x00\x07", status=1),  # non-zero status
+        ack_for(b"\x00\x02"),  # acknowledges another register
+    ],
+)
+def test_write_not_acknowledged(reply):
+    device = Device(FakeTransport(lambda frame: [reply]), timeout=0.05)
+    with pytest.raises(ProtocolError):
+        device.set_brightness(50)

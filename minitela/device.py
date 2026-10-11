@@ -1,12 +1,14 @@
 """High-level operations on the mini screen, over any Transport."""
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 
-from minitela.protocol import commands, registers
-from minitela.protocol.commands import Command, HandshakeResponse
+from minitela.protocol import commands, registers, tags
+from minitela.protocol.commands import Command, HandshakeResponse, ProtocolError
 from minitela.protocol.frame import Frame
 from minitela.protocol.tags import Register
 from minitela.transport.base import Transport
+
+PAGE_COUNT = 10  # pages in the factory layout, see docs/registers.md
 
 
 class Device:
@@ -42,6 +44,27 @@ class Device:
         data = registers.parse_register_values(self._register_request(frame))[register.id]
         assert isinstance(data, bytes)
         return data.split(b"\0", 1)[0].decode(errors="replace")
+
+    def write_numbers(self, values: Mapping[int, int]) -> None:
+        """Set numeric registers, checking that the device acknowledges each one."""
+        for frame in registers.write_numbers(values.items()):
+            self._check_ack(frame)
+
+    def set_brightness(self, percent: int) -> None:
+        if not 0 <= percent <= 100:
+            raise ValueError(f"brightness must be 0-100, got {percent}")
+        self.write_numbers({tags.BRIGHTNESS.id: percent})
+
+    def show_page(self, page: int) -> None:
+        if not 1 <= page <= PAGE_COUNT:
+            raise ValueError(f"page must be 1-{PAGE_COUNT}, got {page}")
+        self.write_numbers({tags.PAGE.id: page})
+
+    def _check_ack(self, frame: Frame) -> None:
+        ack = registers.parse_write_ack(self._register_request(frame))
+        sent = registers.written_registers(frame)
+        if not ack.ok or ack.registers != sent:
+            raise ProtocolError(f"write of registers {sent} not acknowledged: {ack}")
 
     def _register_request(self, frame: Frame) -> Frame:
         return self.transport.request(
