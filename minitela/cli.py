@@ -13,6 +13,7 @@ from minitela.assets import InvalidPackageError, import_deb, library_dir, load_l
 from minitela.device import PAGE_COUNT, Device
 from minitela.protocol import tags
 from minitela.protocol.commands import ProtocolError
+from minitela.sources.weather import WeatherSource, search_cities
 from minitela.transport.base import ResponseTimeout, TransportError
 from minitela.transport.connection import (
     DeviceNotFoundError,
@@ -181,6 +182,24 @@ def _upload_acf(args: argparse.Namespace) -> int:
     return _fail("the texture was sent, but the mini screen did not come back")
 
 
+def _weather(args: argparse.Namespace) -> int:
+    cities = search_cities(args.city)
+    if not cities:
+        return _fail(f"no city found for {args.city!r}")
+    city = cities[0]
+    values = WeatherSource(city).read()
+    print(f"Weather for {city.label}")
+    for register, value in values.items():
+        print(f"  {register.name:24s} {value}")
+    if args.send:
+        device = _connected(args)
+        with device.transport:
+            for register, value in values.items():
+                device.set_tag(register, value)
+            device.show_page(tags.Page.WEATHER)
+    return 0
+
+
 def _page_number(value: str) -> int:
     """A page number or name (whatsapp, reminder, system_info, weather, gif1...)."""
     names = ", ".join(page.name.lower() for page in tags.Page)
@@ -242,6 +261,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="send blocks every 10 ms without waiting for replies, like the official app",
     )
     upload.set_defaults(handler=_upload_acf)
+    weather = subcommands.add_parser("weather", help="show the weather for a city")
+    weather.add_argument("city")
+    weather.add_argument("--send", action="store_true", help="also show it on the mini screen")
+    weather.set_defaults(handler=_weather)
     return parser
 
 

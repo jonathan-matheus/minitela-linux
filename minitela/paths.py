@@ -9,3 +9,8 @@ APP_DIR = "minitela"
 def data_dir() -> Path:
     base = os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share"
     return Path(base) / APP_DIR
+
+
+def cache_dir() -> Path:
+    base = os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache"
+    return Path(base) / APP_DIR

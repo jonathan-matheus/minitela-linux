@@ -307,3 +307,45 @@ def test_progress_is_printed_once_per_percentage(capsys):
     out = capsys.readouterr().out
     assert out.count("Sending texture") == 101
     assert out.endswith("100% (1000/1000 bytes)\n")
+
+
+@pytest.fixture
+def open_meteo(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+    forecast = {
+        "current": {"weather_code": 0, "is_day": 1},
+        "daily": {
+            "time": ["2026-10-11", "2026-10-12", "2026-10-13"],
+            "weather_code": [0, 61, 3],
+            "temperature_2m_min": [24, 25, 25],
+            "temperature_2m_max": [29, 29, 30],
+        },
+    }
+
+    def fetch(url):
+        if "geocoding" not in url:
+            return forecast
+        if "nowhere" in url:
+            return {}
+        return {"results": [{"name": "Recife", "latitude": -8.0, "longitude": -34.9}]}
+
+    monkeypatch.setattr("minitela.sources.weather.fetch_json", fetch)
+
+
+def test_weather(open_meteo, capsys):
+    assert cli.main(["weather", "Recife"]) == 0
+    out = capsys.readouterr().out
+    assert "Weather for Recife" in out
+    assert "forecast1_label          Seg 12" in out
+
+
+def test_weather_send(open_meteo, plugged, screen):
+    assert cli.main(["weather", "Recife", "--send"]) == 0
+    assert screen.texts[2027] == b"Recife"
+    assert screen.numbers[1110] == 0
+    assert screen.numbers[2] == 4
+
+
+def test_weather_unknown_city(open_meteo, capsys):
+    assert cli.main(["weather", "nowhere"]) == 1
+    assert "no city found" in capsys.readouterr().err
