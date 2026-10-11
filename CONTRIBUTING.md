@@ -2,14 +2,16 @@
 
 ## Ambiente de desenvolvimento
 
-Requer Python 3.11+.
+Requer Python 3.11+ e o PyGObject da distribuição (`python-gobject` no Arch, `python3-gi` no
+Debian/Ubuntu, `python3-gobject` no Fedora), usado para o D-Bus e a interface. O ambiente
+virtual precisa enxergar os pacotes do sistema:
 
 ```sh
-python3 -m venv .venv
+python3 -m venv --system-site-packages .venv
 .venv/bin/pip install -e . --group dev
 ```
 
-Com [uv](https://docs.astral.sh/uv/): `uv sync`.
+Sem o PyGObject, os testes que dependem dele são pulados e o resto funciona normalmente.
 
 ## Antes de cada commit
 
