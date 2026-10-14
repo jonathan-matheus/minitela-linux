@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-11 17:22-0300\n"
+"POT-Creation-Date: 2026-10-14 17:46-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -84,7 +84,7 @@ msgid "Not affiliated with Positivo Tecnologia or PoliCorp Tecnologia."
 msgstr ""
 
 #: data/dev.pragmatico.Minitela.metainfo.xml:60
-msgid "First preview."
+msgid "First preview, tested on the Positivo Vision R15M with Arch Linux."
 msgstr ""
 
 #: minitela/ui/app.py:88

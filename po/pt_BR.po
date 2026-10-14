@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: minitela\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-11 17:22-0300\n"
+"POT-Creation-Date: 2026-10-14 17:46-0300\n"
 "PO-Revision-Date: 2026-10-11 17:09-0300\n"
 "Last-Translator: Automatically generated\n"
 "Language-Team: none\n"
@@ -26,8 +26,11 @@ msgid "Mini screen settings"
 msgstr "Configurações da minitela"
 
 #: data/dev.pragmatico.Minitela.desktop:5
-msgid "Show the time, weather, battery and messages on the Positivo Vision mini screen"
-msgstr "Mostra a hora, o clima, a bateria e mensagens na minitela do Positivo Vision"
+msgid ""
+"Show the time, weather, battery and messages on the Positivo Vision mini "
+"screen"
+msgstr ""
+"Mostra a hora, o clima, a bateria e mensagens na minitela do Positivo Vision"
 
 #: data/dev.pragmatico.Minitela.desktop:10
 msgid "Positivo;Vision;mini screen;minitela;"
@@ -38,8 +41,16 @@ msgid "Control the mini screen of the Positivo Vision laptop"
 msgstr "Controle a minitela do notebook Positivo Vision"
 
 #: data/dev.pragmatico.Minitela.metainfo.xml:15
-msgid "Shows the time, weather, battery, connections, a reminder and WhatsApp messages on the small screen next to the keyboard of the Positivo Vision R15M, and lets you choose its GIF. An independent, open source replacement for the official app that works on any distribution."
-msgstr "Mostra a hora, o clima, a bateria, as conexões, um lembrete e mensagens do WhatsApp na pequena tela ao lado do teclado do Positivo Vision R15M, e permite escolher o GIF dela. Um substituto independente e de código aberto para o app oficial, que funciona em qualquer distribuição."
+msgid ""
+"Shows the time, weather, battery, connections, a reminder and WhatsApp "
+"messages on the small screen next to the keyboard of the Positivo Vision "
+"R15M, and lets you choose its GIF. An independent, open source replacement "
+"for the official app that works on any distribution."
+msgstr ""
+"Mostra a hora, o clima, a bateria, as conexões, um lembrete e mensagens do "
+"WhatsApp na pequena tela ao lado do teclado do Positivo Vision R15M, e "
+"permite escolher o GIF dela. Um substituto independente e de código aberto "
+"para o app oficial, que funciona em qualquer distribuição."
 
 #: data/dev.pragmatico.Minitela.metainfo.xml:22
 msgid "Weather forecast for the chosen city, without an API key"
@@ -58,7 +69,8 @@ msgid "The laptop's mini screen key switches pages"
 msgstr "A tecla da minitela no notebook troca de tela"
 
 #: data/dev.pragmatico.Minitela.metainfo.xml:26
-msgid "The mini screen turns off when the laptop suspends or the session is locked"
+msgid ""
+"The mini screen turns off when the laptop suspends or the session is locked"
 msgstr "A minitela apaga quando o notebook suspende ou a sessão é bloqueada"
 
 #: data/dev.pragmatico.Minitela.metainfo.xml:27
@@ -66,16 +78,20 @@ msgid "Factory GIFs, imported from the official package"
 msgstr "GIFs de fábrica, importados do pacote oficial"
 
 #: data/dev.pragmatico.Minitela.metainfo.xml:29
-msgid "The mini screen needs a one-time setup on the host system, which the app explains. It gives the logged-in user access to the device and nothing else."
-msgstr "A minitela precisa de uma configuração única no sistema, que o app explica. Ela dá ao usuário conectado acesso ao dispositivo e a nada mais."
+msgid ""
+"The mini screen needs a one-time setup on the host system, which the app "
+"explains. It gives the logged-in user access to the device and nothing else."
+msgstr ""
+"A minitela precisa de uma configuração única no sistema, que o app explica. "
+"Ela dá ao usuário conectado acesso ao dispositivo e a nada mais."
 
 #: data/dev.pragmatico.Minitela.metainfo.xml:33
 msgid "Not affiliated with Positivo Tecnologia or PoliCorp Tecnologia."
 msgstr "Sem relação com a Positivo Tecnologia ou a PoliCorp Tecnologia."
 
 #: data/dev.pragmatico.Minitela.metainfo.xml:60
-msgid "First preview."
-msgstr "Primeira prévia."
+msgid "First preview, tested on the Positivo Vision R15M with Arch Linux."
+msgstr "Primeira prévia, testada no Positivo Vision R15M com Arch Linux."
 
 #: minitela/ui/app.py:88
 msgid "Open Minitela"
