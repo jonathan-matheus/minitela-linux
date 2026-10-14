@@ -40,6 +40,7 @@ Cada camada só depende das camadas acima dela na lista e pode ser testada sozin
 | `minitela/cli.py` | CLI de diagnóstico, usada para validar cada etapa no hardware. |
 | `minitela/ui/` | App GTK4/libadwaita. |
 | `host/` | Arquivos instalados no sistema host: regra udev e hwdb. |
+| `install.sh` | Instalador para usuários: o Flatpak, o `host/host-setup.sh` e as escolhas de integração. |
 | `po/` | Traduções da interface (gettext). |
 | `build-aux/flatpak/` | Manifesto do Flatpak. |
 | `docs/` | Documentação do protocolo e do formato de arquivos. |
