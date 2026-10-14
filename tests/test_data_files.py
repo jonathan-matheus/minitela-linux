@@ -44,7 +44,11 @@ def test_metainfo(tmp_path):
     assert root.findtext("id") == APP_ID
     assert root.find("launchable").text == f"{APP_ID}.desktop"
     lang = "{http://www.w3.org/XML/1998/namespace}lang"
-    summaries = {element.get(lang): element.text for element in root.iter("summary")}
+    # Older gettext (Ubuntu 24.04) writes pt_BR, newer pt-BR; AppStream accepts both.
+    summaries = {
+        (element.get(lang) or "").replace("_", "-") or None: element.text
+        for element in root.iter("summary")
+    }
     assert summaries == {
         None: "Control the mini screen of the Positivo Vision laptop",
         "pt-BR": "Controle a minitela do notebook Positivo Vision",
