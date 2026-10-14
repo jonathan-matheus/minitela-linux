@@ -475,6 +475,7 @@ def test_config_show_defaults(config_home, capsys):
     assert "pages          1 (whatsapp), 2 (reminder)" in out
     assert "rotation       off" in out
     assert "notifications  on" in out
+    assert "autostart      off" in out
 
 
 @pytest.mark.parametrize(
@@ -485,6 +486,7 @@ def test_config_show_defaults(config_home, capsys):
         (["pages", "weather, 5,1"], "pages          4 (weather), 5 (gif1), 1 (whatsapp)"),
         (["rotation", "20"], "rotation       20 s"),
         (["notifications", "off"], "notifications  off"),
+        (["autostart", "on"], "autostart      on"),
     ],
 )
 def test_config_set(config_home, capsys, argv, line):
@@ -510,6 +512,7 @@ def test_config_clear_city(config_home, capsys):
         (["pages", "1,nope"], "unknown page"),
         (["rotation", "-1"], "number of seconds"),
         (["notifications", "maybe"], "'on' or 'off'"),
+        (["autostart", "yes"], "autostart must be 'on' or 'off'"),
     ],
 )
 def test_config_invalid(config_home, capsys, argv, message):

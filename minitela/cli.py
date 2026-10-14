@@ -292,7 +292,7 @@ def _notifications(args: argparse.Namespace) -> int:
             device.transport.close()
 
 
-CONFIG_KEYS = ("brightness", "city", "pages", "rotation", "notifications")
+CONFIG_KEYS = ("brightness", "city", "pages", "rotation", "notifications", "autostart")
 
 
 def _show_settings(settings: Settings) -> None:
@@ -304,6 +304,7 @@ def _show_settings(settings: Settings) -> None:
     print(f"pages          {pages}")
     print(f"rotation       {rotation}")
     print(f"notifications  {'on' if settings.notifications else 'off'}")
+    print(f"autostart      {'on' if settings.autostart else 'off'}")
 
 
 def _config(args: argparse.Namespace) -> int:
@@ -340,9 +341,11 @@ def _apply_setting(settings: Settings, key: str, value: str) -> None:
             raise ValueError("rotation must be a number of seconds (0 turns it off)")
         settings.rotation_seconds = int(value)
     else:
+        # notifications, or autostart: only records the choice that the app shows; the
+        # session's autostart entry is written by the app or by install.sh.
         if value not in ("on", "off"):
-            raise ValueError("notifications must be 'on' or 'off'")
-        settings.notifications = value == "on"
+            raise ValueError(f"{key} must be 'on' or 'off'")
+        setattr(settings, key, value == "on")
 
 
 def _run(args: argparse.Namespace) -> int:
