@@ -31,49 +31,47 @@ Este projeto reimplementa o protocolo de comunicação da minitela do zero para 
 
 ## Instalação
 
-### 1. Instale o app
-
-Ainda não está no Flathub. Baixe o `minitela.flatpak` da página de releases (ou dos
-artefatos do CI) e instale:
-
-```sh
-flatpak install --user minitela.flatpak
-```
-
-O runtime do GNOME vem do Flathub. Se o Flathub ainda não estiver configurado:
+Um comando instala tudo. Baixe o `install.sh` e o `minitela.flatpak` da página de releases
+(ou dos artefatos do CI), coloque os dois na mesma pasta e rode, como seu usuário (sem
+`sudo`):
 
 ```sh
-flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+sh install.sh
 ```
 
-Para compilar a partir do código, com o `org.flatpak.Builder` do Flathub:
+O instalador:
+
+1. instala o Flatpak, se a distro ainda não tiver (com `pacman`, `dnf`, `apt` ou `zypper`);
+2. instala o app, que vem do `minitela.flatpak` ao lado do script, do código-fonte (se o
+   script estiver dentro do repositório, compilando com o `flatpak-builder`) ou do Flathub;
+3. libera o acesso à minitela e à tecla dela (pede a sua senha, veja abaixo);
+4. pergunta se você quer as notificações do WhatsApp e se o app deve iniciar com a sessão;
+5. mostra como ligar a tecla da minitela no seu desktop e abre o app.
+
+Rodar de novo atualiza o app e permite mudar as respostas. Para remover tudo:
 
 ```sh
-flatpak install --user flathub org.flatpak.Builder
-flatpak run org.flatpak.Builder --user --install --force-clean build-dir \
-    build-aux/flatpak/dev.pragmatico.Minitela.yml
+sh install.sh --uninstall                 # mantém configurações e GIFs importados
+sh install.sh --uninstall --delete-data   # apaga também
 ```
 
-### 2. Libere o acesso à minitela (uma vez)
+As opções (`--yes`, `--notifications`, `--no-autostart`, `--bundle ARQUIVO`...) estão em
+`sh install.sh --help`.
 
-Um app Flatpak não pode mudar o sistema sozinho. Rode uma vez no terminal (o app mostra o
-mesmo comando se não tiver permissão):
+### O que precisa de `sudo`
 
-```sh
-flatpak run --command=cat dev.pragmatico.Minitela /app/share/minitela/host-setup.sh | sudo sh -s install
-```
-
-Isso instala dois arquivos:
+Só um passo, e só porque um app Flatpak não pode mudar o sistema sozinho: instalar dois
+arquivos do udev. O script que faz isso vem dentro do próprio app
+(`/app/share/minitela/host-setup.sh`).
 
 - `/etc/udev/rules.d/70-minitela.rules`: dá acesso à porta serial da minitela só ao usuário
   da sessão ativa (`uaccess`), e a nenhuma outra porta.
 - `/etc/udev/hwdb.d/70-minitela-keyboard.hwdb`: faz a tecla da minitela gerar
   `KEY_PROG1` (`XF86Launch1`).
 
-Funciona em qualquer distro com systemd (Arch, Fedora, Ubuntu, Debian, openSUSE...). Para
-conferir, use `... | sh -s status`; para desfazer, `... | sudo sh -s uninstall`.
+Funciona em qualquer distro com systemd (Arch, Fedora, Ubuntu, Debian, openSUSE...).
 
-### 3. Importe os GIFs de fábrica (opcional)
+### Importe os GIFs de fábrica (opcional)
 
 Os GIFs pertencem à fabricante e não são distribuídos aqui. Baixe o pacote oficial
 (`minitela_*.deb`) e, na aba **GIFs**, use **Importar pacote oficial…**. O arquivo só é
@@ -82,21 +80,42 @@ lido: nada do app oficial é instalado.
 ### Vindo do app oficial
 
 Feche e desinstale o app oficial antes: dois programas não podem usar a minitela ao mesmo
-tempo. O passo 2 avisa se encontrar as regras `0666` antigas
+tempo. O instalador avisa se encontrar as regras `0666` antigas
 (`/etc/udev/rules.d/99-ttyacm.rules` e `99-custom-input.rules`); elas podem ser apagadas.
+
+<details>
+<summary>Instalação manual, sem o <code>install.sh</code></summary>
+
+```sh
+# O app (o runtime do GNOME vem do Flathub)
+flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+flatpak install --user minitela.flatpak
+
+# Acesso à minitela (uma vez); troque install por status ou uninstall
+flatpak run --command=cat dev.pragmatico.Minitela /app/share/minitela/host-setup.sh | sudo sh -s install
+```
+
+Para compilar a partir do código:
+
+```sh
+flatpak install --user flathub org.flatpak.Builder
+flatpak run org.flatpak.Builder --user --install --force-clean --install-deps-from=flathub \
+    build-dir build-aux/flatpak/dev.pragmatico.Minitela.yml
+```
+
+</details>
 
 ## Integração com o desktop
 
 ### Notificações do WhatsApp
 
 Para ler as notificações, o app precisa observar o barramento da sessão, uma permissão
-ampla que o Flatpak não concede por padrão. Para ativar:
+ampla que o Flatpak não concede por padrão. O instalador pergunta se você quer liberá-la;
+sem ela, todo o resto funciona normalmente. Manualmente:
 
 ```sh
 flatpak override --user --socket=session-bus dev.pragmatico.Minitela
 ```
-
-Sem ela, todo o resto funciona normalmente.
 
 ### Tecla da minitela
 
@@ -116,19 +135,13 @@ flatpak run --command=minitela dev.pragmatico.Minitela next-page
 
 ### Iniciar com a sessão
 
-Na aba **Tela**, ative **Iniciar com a sessão**. O app passa a abrir escondido no login e
-continua atualizando a minitela com a janela fechada (há um ícone na bandeja, se o desktop
-tiver uma).
+O instalador pergunta se o app deve abrir escondido no login, continuando a atualizar a
+minitela com a janela fechada (há um ícone na bandeja, se o desktop tiver uma). Ele cria a
+entrada `~/.config/autostart/dev.pragmatico.Minitela.desktop`, que funciona em qualquer
+desktop, inclusive no Hyprland.
 
-No Hyprland, que não oferece o portal usado para isso, crie a entrada de autostart à mão:
-
-```sh
-mkdir -p ~/.config/autostart
-printf '[Desktop Entry]\nType=Application\nName=Minitela\nExec=flatpak run dev.pragmatico.Minitela --background\n' \
-    > ~/.config/autostart/dev.pragmatico.Minitela.desktop
-```
-
-Ou, no `hyprland.conf`: `exec-once = flatpak run dev.pragmatico.Minitela --background`.
+No GNOME e no KDE também dá para mudar isso na aba **Tela** do app (**Iniciar com a
+sessão**). No Hyprland, que não oferece o portal usado pelo app, rode o instalador de novo.
 
 ### Bloqueio de tela
 
@@ -149,8 +162,9 @@ bloqueio ao systemd-logind, além do Hyprland (hyprlock).
 
 ## Problemas comuns
 
-- **"Sem permissão para usar a minitela"**: rode o passo 2 e verifique com `status`. A
-  permissão vale para a sessão local ativa; uma sessão remota (SSH) não recebe acesso.
+- **"Sem permissão para usar a minitela"**: rode `sh install.sh` de novo (ou o comando da
+  instalação manual com `status` para conferir). A permissão vale para a sessão local
+  ativa; uma sessão remota (SSH) não recebe acesso.
 - **"Outro processo do Minitela está controlando a minitela"**: outra cópia (ou o
   `minitela run` da linha de comando) já está rodando. Feche-a, ou use a bandeja dela.
 - **Diagnóstico**: `flatpak run --command=minitela dev.pragmatico.Minitela probe` mostra
